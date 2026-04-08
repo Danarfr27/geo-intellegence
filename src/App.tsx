@@ -106,10 +106,10 @@ const mockNews: NewsItem[] = [
 
 // YouTube Live News Feeds
 const mockVideos: VideoFeed[] = [
-  { id: '1', title: 'Al Jazeera English - Live', source: 'Al Jazeera', embedUrl: 'https://www.youtube.com/embed/gCNeDWCI0vo?autoplay=0&mute=1', isLive: true },
-  { id: '2', title: 'Sky News - Live', source: 'Sky News', embedUrl: 'https://www.youtube.com/embed/9Auq9mYxFEE?autoplay=0&mute=1', isLive: true },
-  { id: '3', title: 'TRT World - Live', source: 'TRT World', embedUrl: 'https://www.youtube.com/embed/8ISV-K2cWeg?autoplay=0&mute=1', isLive: true },
-  { id: '4', title: 'FRANCE 24 - Live', source: 'FRANCE 24', embedUrl: 'https://www.youtube.com/embed/h3MuIUNCCzI?autoplay=0&mute=1', isLive: true },
+  { id: '1', title: 'Al Jazeera English - Live', source: 'Al Jazeera', embedUrl: 'https://www.youtube.com/embed/gCNeDWCI0vo?autoplay=1&mute=1', isLive: true },
+  { id: '2', title: 'Sky News - Live', source: 'Sky News', embedUrl: 'https://www.youtube.com/embed/9Auq9mYxFEE?autoplay=1&mute=1', isLive: true },
+  { id: '3', title: 'TRT World - Live', source: 'TRT World', embedUrl: 'https://www.youtube.com/embed/8ISV-K2cWeg?autoplay=1&mute=1', isLive: true },
+  { id: '4', title: 'FRANCE 24 - Live', source: 'FRANCE 24', embedUrl: 'https://www.youtube.com/embed/h3MuIUNCCzI?autoplay=1&mute=1', isLive: true },
 ];
 
 const mockEarthquakes: EarthquakeData[] = [
@@ -512,8 +512,7 @@ function NewsPanel({ news }: { news: NewsItem[] }) {
 }
 
 function VideoPanel({ videos }: { videos: VideoFeed[] }) {
-  const [activeVideo, setActiveVideo] = useState<string | null>(null);
-  
+  // Always autoplay all live feeds (muted) by default
   return (
     <div className="flex flex-col bg-[#0f1115]">
       <div className="p-2.5 border-b border-[#1e2128] flex items-center justify-between">
@@ -526,42 +525,22 @@ function VideoPanel({ videos }: { videos: VideoFeed[] }) {
           <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
         </div>
       </div>
-      
       <div className="p-2 grid grid-cols-2 gap-2">
         {videos.map((video) => (
           <div key={video.id} className="relative bg-[#0a0c10] rounded overflow-hidden group">
             <div className="aspect-video relative">
-              {activeVideo === video.id ? (
-                <iframe
-                  src={video.embedUrl}
-                  title={video.title}
-                  className="absolute inset-0 w-full h-full"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              ) : (
-                <>
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#1a1d24] to-[#0a0c10] flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-2 group-hover:bg-red-500/30 transition-colors">
-                        <Play className="w-4 h-4 text-red-500 ml-0.5" />
-                      </div>
-                      <p className="text-[9px] text-gray-500">Click to play</p>
-                    </div>
-                  </div>
-                  <div 
-                    className="absolute inset-0 cursor-pointer"
-                    onClick={() => setActiveVideo(video.id)}
-                  />
-                </>
-              )}
-              
+              <iframe
+                src={video.embedUrl}
+                title={video.title}
+                className="absolute inset-0 w-full h-full"
+                allow="autoplay; encrypted-media"
+                allowFullScreen
+              />
               {/* Live Badge */}
               <div className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/60 rounded px-1.5 py-0.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                 <span className="text-[9px] font-medium text-white">LIVE</span>
               </div>
-              
               {/* Source */}
               <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/80 to-transparent">
                 <div className="text-[9px] text-white/90 truncate">{video.source}</div>
