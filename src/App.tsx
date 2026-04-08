@@ -1,34 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Papa from 'papaparse';
-import { 
-  Globe, 
-  Newspaper, 
-  Video, 
-  Activity, 
-  AlertTriangle, 
-  Command,
-  TrendingUp,
-  TrendingDown,
-  Clock,
-  Zap,
-  Shield,
-  Satellite,
-  ChevronRight,
-  Play,
-  Filter,
-  RefreshCw,
-  Database,
-  Cpu,
-  Eye,
-  Target,
-  ExternalLink
-} from 'lucide-react';
 import { format } from 'date-fns';
 import { ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { Globe, Newspaper, Video, Activity, AlertTriangle, Command, TrendingUp, TrendingDown, Clock, Zap, Shield, Satellite, ChevronRight, Filter, RefreshCw, Database, Cpu, Eye, Target, ExternalLink } from 'lucide-react';
+import countries from './lib/countries.json';
 
 // Utility
 function cn(...inputs: ClassValue[]) {
@@ -45,6 +24,7 @@ interface ConflictEvent {
   severity: 'critical' | 'high' | 'medium' | 'low';
   timestamp: Date;
   description: string;
+  countryCode?: string;
 }
 
 interface NewsItem {
@@ -82,65 +62,42 @@ interface EscalationMetric {
   change: number;
 }
 
+// API Configuration
+const GDELT_CSV_URL = import.meta.env.VITE_GDELT_CSV_URL || 'http://data.gdeltproject.org/events/last15minutes.csv';
+const NEWSAPI_KEY = import.meta.env.VITE_NEWSAPI_KEY;
 
-// GDELT CSV columns reference: https://blog.gdeltproject.org/gdelt-2-0-our-global-world-in-realtime/
-// [0]=GLOBALEVENTID, [53]=ActionGeo_Lat, [54]=ActionGeo_Long, [23]=EventCode, [26]=GoldsteinScale, [34]=Actor1Name, [51]=ActionGeo_CountryCode
+// Helper function to parse country from prompt
+function parseCountryFromPrompt(prompt: string) {
+  const countryName = prompt.replace('/newsnow', '').trim();
+  return countries.find((c: any) => c.name.toLowerCase().includes(countryName.toLowerCase()));
+}
 
-const GDELT_CSV_URL = 'http://data.gdeltproject.org/events/last15minutes.csv';
+// Helper function to determine event severity based on Goldstein scale
+function getSeverityFromGoldstein(scale: number): 'critical' | 'high' | 'medium' | 'low' {
+  if (scale >= 8) return 'critical';
+  if (scale >= 4) return 'high';
+  if (scale >= 0) return 'medium';
+  return 'low';
+}
 
-
-const mockNews: NewsItem[] = [
-  { id: '1', title: 'Israel launches targeted strikes on Gaza militant positions', source: 'Reuters', timestamp: new Date(Date.now() - 300000), category: 'Conflict', severity: 'critical', url: 'https://www.reuters.com/world/middle-east/' },
-  { id: '2', title: 'Hezbollah claims responsibility for border attack', source: 'Al Jazeera', timestamp: new Date(Date.now() - 600000), category: 'Conflict', severity: 'high', url: 'https://www.aljazeera.com/news/' },
-  { id: '3', title: 'Iran warns of decisive response to any aggression', source: 'BBC', timestamp: new Date(Date.now() - 900000), category: 'Diplomacy', severity: 'high', url: 'https://www.bbc.com/news/world-middle-east' },
-  { id: '4', title: 'US deploys additional carrier group to Mediterranean', source: 'CNN', timestamp: new Date(Date.now() - 1200000), category: 'Military', severity: 'medium', url: 'https://edition.cnn.com/middleeast' },
-  { id: '5', title: 'Russia condemns escalation in Middle East', source: 'RT', timestamp: new Date(Date.now() - 1500000), category: 'Diplomacy', severity: 'medium', url: 'https://www.rt.com/news/' },
-  { id: '6', title: 'Egypt opens Rafah crossing for humanitarian aid', source: 'AP', timestamp: new Date(Date.now() - 1800000), category: 'Humanitarian', severity: 'low', url: 'https://apnews.com/hub/middle-east' },
-  { id: '7', title: 'UN Security Council emergency session called', source: 'UN News', timestamp: new Date(Date.now() - 2100000), category: 'Diplomacy', severity: 'medium', url: 'https://news.un.org/en/' },
-  { id: '8', title: 'Oil prices surge amid Middle East tensions', source: 'Bloomberg', timestamp: new Date(Date.now() - 2400000), category: 'Economy', severity: 'medium', url: 'https://www.bloomberg.com/middleeast' },
-];
-
-// YouTube Live News Feeds
-const mockVideos: VideoFeed[] = [
-  { id: '1', title: 'Al Jazeera English - Live', source: 'Al Jazeera', embedUrl: 'https://www.youtube.com/embed/gCNeDWCI0vo?autoplay=1&mute=1', isLive: true },
-  { id: '2', title: 'Sky News - Live', source: 'Sky News', embedUrl: 'https://www.youtube.com/embed/9Auq9mYxFEE?autoplay=1&mute=1', isLive: true },
-  { id: '3', title: 'TRT World - Live', source: 'TRT World', embedUrl: 'https://www.youtube.com/embed/8ISV-K2cWeg?autoplay=1&mute=1', isLive: true },
-  { id: '4', title: 'FRANCE 24 - Live', source: 'FRANCE 24', embedUrl: 'https://www.youtube.com/embed/h3MuIUNCCzI?autoplay=1&mute=1', isLive: true },
-];
-
-const mockEarthquakes: EarthquakeData[] = [
-  { id: '1', location: 'Near Iran-Iraq Border', magnitude: 4.8, depth: 12, timestamp: new Date(Date.now() - 1800000), lat: 33.8, lng: 45.9 },
-  { id: '2', location: 'Eastern Mediterranean', magnitude: 3.2, depth: 25, timestamp: new Date(Date.now() - 3600000), lat: 35.2, lng: 30.5 },
-  { id: '3', location: 'Northern Turkey', magnitude: 4.1, depth: 8, timestamp: new Date(Date.now() - 5400000), lat: 39.9, lng: 41.3 },
-];
-
-const mockEscalationMetrics: EscalationMetric[] = [
-  { region: 'Middle East', level: 87, trend: 'up', change: 12 },
-  { region: 'Eastern Europe', level: 72, trend: 'stable', change: 0 },
-  { region: 'East Asia', level: 45, trend: 'down', change: -5 },
-  { region: 'Africa', level: 58, trend: 'up', change: 8 },
-];
-
-const chartData = [
-  { time: '00:00', value: 45 },
-  { time: '04:00', value: 52 },
-  { time: '08:00', value: 48 },
-  { time: '12:00', value: 67 },
-  { time: '16:00', value: 78 },
-  { time: '20:00', value: 85 },
-  { time: '24:00', value: 87 },
-];
+// Helper function to get event type
+function getEventType(eventCode: string): 'conflict' | 'earthquake' | 'cyber' | 'political' {
+  const code = parseInt(eventCode);
+  if (code >= 190 && code <= 195) return 'conflict';
+  if (code >= 10 && code <= 13) return 'political';
+  return 'conflict';
+}
 
 // Custom Map Markers
 const createCustomIcon = (severity: string, type: string) => {
-  const colors = {
+  const colors: Record<string, string> = {
     critical: '#ef4444',
     high: '#f97316',
     medium: '#eab308',
     low: '#22c55e',
   };
   
-  const icons = {
+  const icons: Record<string, string> = {
     conflict: '⚔️',
     earthquake: '🌋',
     cyber: '💻',
@@ -153,17 +110,17 @@ const createCustomIcon = (severity: string, type: string) => {
       <div style="
         width: 28px;
         height: 28px;
-        background: ${colors[severity as keyof typeof colors]};
+        background: ${colors[severity] || colors['medium']};
         border-radius: 50%;
         border: 2px solid #0a0c10;
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 12px;
-        box-shadow: 0 0 12px ${colors[severity as keyof typeof colors]}80;
+        box-shadow: 0 0 12px ${colors[severity] || colors['medium']}80;
         animation: marker-pulse 2s ease-in-out infinite;
       ">
-        ${icons[type as keyof typeof icons]}
+        ${icons[type] || '📍'}
       </div>
     `,
     iconSize: [28, 28],
@@ -206,7 +163,7 @@ function Header({ onCommand }: { onCommand: (cmd: string) => void }) {
           type="text"
           value={command}
           onChange={(e) => setCommand(e.target.value)}
-          placeholder="newsnow iran israel war"
+          placeholder="newsnow [COUNTRY NAME]"
           className="bg-transparent border-none outline-none text-xs w-full text-gray-300 placeholder:text-gray-600"
         />
         {command && (
@@ -274,7 +231,7 @@ function Sidebar({ selectedFilters, onFilterChange }: {
   
   const dataSources = [
     { name: 'GDELT API', status: 'active', latency: '45ms' },
-    { name: 'ACLED', status: 'active', latency: '62ms' },
+    { name: 'NewsAPI', status: 'active', latency: '62ms' },
     { name: 'USGS', status: 'active', latency: '38ms' },
     { name: 'Reuters RSS', status: 'active', latency: '120ms' },
     { name: 'Liveuamap', status: 'warning', latency: '245ms' },
@@ -344,13 +301,15 @@ function WorldMap({
   selectedFilters,
   onRefresh,
   showSatellite,
-  toggleSatellite
+  toggleSatellite,
+  mapCenter
 }: { 
   events: ConflictEvent[]; 
   selectedFilters: string[];
   onRefresh: () => void;
   showSatellite: boolean;
   toggleSatellite: () => void;
+  mapCenter: [number, number];
 }) {
   const filteredEvents = selectedFilters.length > 0 
     ? events.filter(e => selectedFilters.includes(e.type))
@@ -359,7 +318,7 @@ function WorldMap({
   return (
     <div className="relative h-full bg-[#0a0c10]">
       <MapContainer
-        center={[25, 20]}
+        center={mapCenter}
         zoom={2}
         minZoom={2}
         maxZoom={10}
@@ -472,43 +431,46 @@ function NewsPanel({ news }: { news: NewsItem[] }) {
       </div>
       
       <div className="flex-1 overflow-y-auto custom-scrollbar">
-        {news.map((item) => (
-          <a 
-            key={item.id} 
-            href={item.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block p-2.5 border-b border-[#1e2128] hover:bg-[#15181e] transition-colors group"
-          >
-            <div className="flex items-start gap-2">
-              <span className={cn(
-                "px-1.5 py-0.5 rounded text-[9px] font-medium shrink-0 mt-0.5",
-                item.severity === 'critical' && "bg-red-500/20 text-red-400",
-                item.severity === 'high' && "bg-orange-500/20 text-orange-400",
-                item.severity === 'medium' && "bg-yellow-500/20 text-yellow-400",
-                item.severity === 'low' && "bg-green-500/20 text-green-400",
-              )}>
-                {item.category}
-              </span>
-              <div className="flex-1 min-w-0">
-                <h4 className="text-xs text-gray-200 leading-snug mb-1 line-clamp-2 group-hover:text-white transition-colors">{item.title}</h4>
-                <div className="flex items-center gap-2 text-[10px] text-gray-500">
-                  <span>{item.source}</span>
-                  <span>•</span>
-                  <span>{format(item.timestamp, 'HH:mm')}</span>
-                  <ExternalLink className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+        {news.length > 0 ? (
+          news.map((item) => (
+            <a 
+              key={item.id} 
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block p-2.5 border-b border-[#1e2128] hover:bg-[#15181e] transition-colors group"
+            >
+              <div className="flex items-start gap-2">
+                <span className={cn(
+                  "px-1.5 py-0.5 rounded text-[9px] font-medium shrink-0 mt-0.5",
+                  item.severity === 'critical' && "bg-red-500/20 text-red-400",
+                  item.severity === 'high' && "bg-orange-500/20 text-orange-400",
+                  item.severity === 'medium' && "bg-yellow-500/20 text-yellow-400",
+                  item.severity === 'low' && "bg-green-500/20 text-green-400",
+                )}>
+                  {item.category}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-xs text-gray-200 leading-snug mb-1 line-clamp-2 group-hover:text-white transition-colors">{item.title}</h4>
+                  <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                    <span>{item.source}</span>
+                    <span>•</span>
+                    <span>{format(item.timestamp, 'HH:mm')}</span>
+                    <ExternalLink className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
                 </div>
               </div>
-            </div>
-          </a>
-        ))}
+            </a>
+          ))
+        ) : (
+          <div className="p-4 text-center text-gray-500 text-xs">No news available</div>
+        )}
       </div>
     </div>
   );
 }
 
 function VideoPanel({ videos }: { videos: VideoFeed[] }) {
-  // Always autoplay all live feeds (muted) by default
   return (
     <div className="flex flex-col bg-[#0f1115]">
       <div className="p-2.5 border-b border-[#1e2128] flex items-center justify-between">
@@ -517,39 +479,51 @@ function VideoPanel({ videos }: { videos: VideoFeed[] }) {
           <span>LIVE VIDEO FEEDS</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-gray-500">4 ACTIVE</span>
+          <span className="text-[10px] text-gray-500">{videos.length} ACTIVE</span>
           <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
         </div>
       </div>
       <div className="p-2 grid grid-cols-2 gap-2">
-        {videos.map((video) => (
-          <div key={video.id} className="relative bg-[#0a0c10] rounded overflow-hidden group">
-            <div className="aspect-video relative">
-              <iframe
-                src={video.embedUrl}
-                title={video.title}
-                className="absolute inset-0 w-full h-full"
-                allow="autoplay; encrypted-media"
-                allowFullScreen
-              />
-              {/* Live Badge */}
-              <div className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/60 rounded px-1.5 py-0.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-[9px] font-medium text-white">LIVE</span>
-              </div>
-              {/* Source */}
-              <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/80 to-transparent">
-                <div className="text-[9px] text-white/90 truncate">{video.source}</div>
+        {videos.length > 0 ? (
+          videos.map((video) => (
+            <div key={video.id} className="relative bg-[#0a0c10] rounded overflow-hidden group">
+              <div className="aspect-video relative">
+                <iframe
+                  src={video.embedUrl}
+                  title={video.title}
+                  className="absolute inset-0 w-full h-full"
+                  allow="autoplay; encrypted-media"
+                  allowFullScreen
+                />
+                <div className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/60 rounded px-1.5 py-0.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-[9px] font-medium text-white">LIVE</span>
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/80 to-transparent">
+                  <div className="text-[9px] text-white/90 truncate">{video.source}</div>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        ) : (
+          <div className="col-span-2 p-4 text-center text-gray-500 text-xs">No videos available</div>
+        )}
       </div>
     </div>
   );
 }
 
 function EscalationPanel({ metrics }: { metrics: EscalationMetric[] }) {
+  const chartData = [
+    { time: '00:00', value: 45 },
+    { time: '04:00', value: 52 },
+    { time: '08:00', value: 48 },
+    { time: '12:00', value: 67 },
+    { time: '16:00', value: 78 },
+    { time: '20:00', value: 85 },
+    { time: '24:00', value: 87 },
+  ];
+
   return (
     <div className="flex flex-col bg-[#0f1115]">
       <div className="p-2.5 border-b border-[#1e2128] flex items-center justify-between">
@@ -575,7 +549,7 @@ function EscalationPanel({ metrics }: { metrics: EscalationMetric[] }) {
                 )}>
                   {metric.trend === 'up' && <TrendingUp className="w-3 h-3" />}
                   {metric.trend === 'down' && <TrendingDown className="w-3 h-3" />}
-                  {metric.change > 0 && '+'}{metric.change}
+                  <span>{metric.trend === 'up' ? '+' : metric.trend === 'down' ? '-' : ''}{Math.abs(metric.change)}</span>
                 </span>
               </div>
             </div>
@@ -599,20 +573,7 @@ function EscalationPanel({ metrics }: { metrics: EscalationMetric[] }) {
           <div className="h-12">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="escalationGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <Area 
-                  type="monotone" 
-                  dataKey="value" 
-                  stroke="#ef4444" 
-                  fillOpacity={1} 
-                  fill="url(#escalationGradient)" 
-                  strokeWidth={1}
-                />
+                <Area type="monotone" dataKey="value" stroke="#ef4444" fill="#ef4444" isAnimationActive={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -636,31 +597,26 @@ function EarthquakePanel({ earthquakes }: { earthquakes: EarthquakeData[] }) {
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         <table className="w-full text-[10px]">
           <thead>
-            <tr className="text-left">
-              <th className="py-2 px-2.5 text-gray-500 font-medium">Location</th>
-              <th className="py-2 px-2.5 text-gray-500 font-medium w-12">Mag</th>
-              <th className="py-2 px-2.5 text-gray-500 font-medium w-14">Depth</th>
-              <th className="py-2 px-2.5 text-gray-500 font-medium w-12">Time</th>
+            <tr className="text-gray-500 border-b border-[#1e2128]">
+              <th className="text-left p-2">Location</th>
+              <th className="text-center p-2">Magnitude</th>
+              <th className="text-center p-2">Depth</th>
             </tr>
           </thead>
           <tbody>
-            {earthquakes.map((eq) => (
-              <tr key={eq.id} className="border-t border-[#1e2128] hover:bg-[#15181e]">
-                <td className="py-2 px-2.5 text-gray-300 truncate max-w-[100px]">{eq.location}</td>
-                <td className="py-2 px-2.5">
-                  <span className={cn(
-                    "font-mono font-medium",
-                    eq.magnitude >= 5 && "text-red-400",
-                    eq.magnitude >= 4 && eq.magnitude < 5 && "text-orange-400",
-                    eq.magnitude < 4 && "text-yellow-400",
-                  )}>
-                    {eq.magnitude.toFixed(1)}
-                  </span>
-                </td>
-                <td className="py-2 px-2.5 text-gray-500 font-mono">{eq.depth}km</td>
-                <td className="py-2 px-2.5 text-gray-500">{format(eq.timestamp, 'HH:mm')}</td>
+            {earthquakes.length > 0 ? (
+              earthquakes.map((eq) => (
+                <tr key={eq.id} className="border-b border-[#1e2128] hover:bg-[#15181e]">
+                  <td className="p-2 text-gray-300">{eq.location}</td>
+                  <td className="text-center p-2 text-orange-400 font-medium">{eq.magnitude}</td>
+                  <td className="text-center p-2 text-gray-400">{eq.depth}km</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={3} className="p-4 text-center text-gray-500">No seismic activity</td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>
@@ -681,7 +637,7 @@ function AISummaryPanel() {
       <div className="p-2.5 border-b border-[#1e2128] flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs font-medium text-gray-300">
           <Zap className="w-3.5 h-3.5 text-purple-400" />
-          <span>AI INTELLIGENCE SUMMARY</span>
+          <span>AI SUMMARY</span>
         </div>
         <button 
           onClick={handleRegenerate}
@@ -693,31 +649,36 @@ function AISummaryPanel() {
       </div>
       
       <div className="p-2.5">
-        <div className="bg-gradient-to-br from-purple-500/8 to-blue-500/8 border border-purple-500/15 rounded p-2.5">
-          <div className="flex items-start gap-2.5">
-            <div className="w-7 h-7 rounded bg-purple-500/15 flex items-center justify-center shrink-0">
-              <Cpu className="w-3.5 h-3.5 text-purple-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h4 className="text-xs font-medium text-white mb-1.5">Current Situation Analysis</h4>
-              <p className="text-[10px] text-gray-400 leading-relaxed">
-                Tensions in the Middle East have escalated significantly in the past 24 hours. 
-                Military operations in Gaza Strip continue with increased intensity. 
-                Hezbollah has claimed responsibility for cross-border attacks, raising concerns 
-                of wider regional conflict.
-              </p>
-              <div className="mt-2 flex items-center gap-3">
-                <div className="flex items-center gap-1">
-                  <AlertTriangle className="w-3 h-3 text-orange-400" />
-                  <span className="text-[9px] text-orange-400">HIGH RISK</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-gray-500" />
-                  <span className="text-[9px] text-gray-500">Updated 2 min ago</span>
-                </div>
+        <div className="space-y-2">
+          <div className="bg-purple-500/10 border border-purple-500/20 rounded p-2 text-[10px] text-purple-300">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-3 h-3 text-orange-400 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium mb-1">Current Status Summary</p>
+                <p className="text-purple-400/80">Global escalation metrics showing increased activity in the Middle East region. Multiple conflict zones reporting elevated tensions. Recommend monitoring closely over next 48 hours.</p>
               </div>
             </div>
           </div>
+          
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-[#15181e] p-2 rounded">
+              <div className="text-[9px] text-gray-500 mb-1">Predicted Trend</div>
+              <div className="flex items-center gap-1">
+                <TrendingUp className="w-3 h-3 text-red-400" />
+                <span className="text-[10px] text-red-400 font-medium">INCREASING</span>
+              </div>
+            </div>
+            <div className="bg-[#15181e] p-2 rounded">
+              <div className="text-[9px] text-gray-500 mb-1">Confidence</div>
+              <span className="text-[10px] text-blue-400 font-medium">87%</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-1 mt-2">
+          <div className="h-1 flex-1 bg-red-500/20 rounded-full" />
+          <div className="h-1 flex-1 bg-red-500/20 rounded-full" />
+          <div className="h-1 flex-1 bg-red-500/10 rounded-full" />
         </div>
       </div>
     </div>
@@ -727,133 +688,179 @@ function AISummaryPanel() {
 // Main App
 function App() {
   const [selectedFilters, setSelectedFilters] = useState<string[]>(['conflict']);
-  const [showCommandResult, setShowCommandResult] = useState(false);
-  const [commandQuery, setCommandQuery] = useState('');
   const [showSatellite, setShowSatellite] = useState(false);
-  const [mapKey, setMapKey] = useState(0);
   const [gdeltEvents, setGdeltEvents] = useState<ConflictEvent[]>([]);
+  const [filteredNews, setFilteredNews] = useState<NewsItem[]>([]);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([25, 20]);
+  const [selectedCountry, setSelectedCountry] = useState<any>(null);
 
-  // Fetch GDELT CSV and parse to ConflictEvent[]
+  // Fetch GDELT CSV and parse (auto-refresh every 30 seconds)
   useEffect(() => {
-    fetch(GDELT_CSV_URL)
-      .then(res => res.text())
-      .then(csv => {
-        Papa.parse(csv, {
-          complete: (results) => {
-            // Each row is an array of columns
-            const events: ConflictEvent[] = (results.data as string[][])
-              .filter(row => row.length > 54 && row[53] && row[54])
-              .map((row, idx) => ({
-                id: row[0] || `gdelt-${idx}`,
-                lat: parseFloat(row[53]),
-                lng: parseFloat(row[54]),
-                title: row[34] || 'Unknown', // Actor1Name
-                type: parseEventType(row[23]), // EventCode
-                severity: parseSeverity(row[26]), // GoldsteinScale
-                timestamp: parseGdeltDate(row[1]), // SQLDATE
-                description: row[57] || row[34] || 'Event', // ActionGeo_FullName or Actor1Name
-              }));
-            setGdeltEvents(events);
-          },
+    const fetchGDELT = async () => {
+      try {
+        const response = await fetch(GDELT_CSV_URL);
+        const csvText = await response.text();
+        
+        Papa.parse(csvText, {
+          header: false,
           skipEmptyLines: true,
+          complete: (results) => {
+            const events: ConflictEvent[] = [];
+            const csvData = results.data as string[][];
+            
+            csvData.slice(0, 100).forEach((row, idx) => {
+              if (row.length > 54 && row[53] && row[54]) {
+                try {
+                  const lat = parseFloat(row[53]);
+                  const lng = parseFloat(row[54]);
+                  const eventCode = row[23] || '190';
+                  const goldsteinScale = parseFloat(row[26] || '1');
+                  const actor = row[34] || 'Unknown';
+                  const timestamp = new Date();
+                  
+                  if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+                    events.push({
+                      id: row[0] || `gdelt-${idx}`,
+                      lat,
+                      lng,
+                      title: `Event: ${actor}`,
+                      type: getEventType(eventCode),
+                      severity: getSeverityFromGoldstein(goldsteinScale),
+                      timestamp,
+                      description: `Event Code: ${eventCode}, Actor: ${actor}`,
+                      countryCode: row[51],
+                    });
+                  }
+                } catch (e) {
+                  // Skip parsing errors
+                }
+              }
+            });
+            
+            setGdeltEvents(events);
+          }
         });
-      });
-  }, [mapKey]); // refetch on refresh
+      } catch (error) {
+        console.error('Failed to fetch GDELT:', error);
+      }
+    };
+    
+    fetchGDELT();
+    const interval = setInterval(fetchGDELT, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
-  // Helper: map GDELT EventCode to type
-  function parseEventType(code: string): 'conflict' | 'earthquake' | 'cyber' | 'political' {
-    if (!code) return 'conflict';
-    if (code.startsWith('1')) return 'political';
-    if (code.startsWith('2')) return 'conflict';
-    if (code.startsWith('3')) return 'conflict';
-    if (code.startsWith('7')) return 'cyber';
-    return 'conflict';
-  }
-  // Helper: map GoldsteinScale to severity
-  function parseSeverity(scale: string): 'critical' | 'high' | 'medium' | 'low' {
-    const val = parseFloat(scale);
-    if (val >= 5) return 'critical';
-    if (val >= 2) return 'high';
-    if (val >= 0) return 'medium';
-    return 'low';
-  }
-  // Helper: parse GDELT SQLDATE (yyyymmdd)
-  function parseGdeltDate(sqlDate: string): Date {
-    if (!sqlDate || sqlDate.length !== 8) return new Date();
-    const y = +sqlDate.slice(0, 4);
-    const m = +sqlDate.slice(4, 6) - 1;
-    const d = +sqlDate.slice(6, 8);
-    return new Date(y, m, d);
-  }
+  // Fetch NewsAPI (auto-refresh every 60 seconds)
+  useEffect(() => {
+    const fetchNews = async () => {
+      if (!NEWSAPI_KEY) {
+        console.warn('VITE_NEWSAPI_KEY not set');
+        return;
+      }
+      
+      try {
+        const country = selectedCountry?.name || 'world';
+        const response = await fetch(
+          `https://newsapi.org/v2/everything?q=${country}&sortBy=publishedAt&language=en&pageSize=10&apiKey=${NEWSAPI_KEY}`
+        );
+        const data = await response.json();
+        
+        const news: NewsItem[] = (data.articles || []).slice(0, 10).map((article: any, idx: number) => ({
+          id: `news-${idx}`,
+          title: article.title,
+          source: article.source.name,
+          timestamp: new Date(article.publishedAt),
+          category: 'News',
+          severity: 'medium' as const,
+          url: article.url,
+        }));
+        
+        setFilteredNews(news);
+      } catch (error) {
+        console.error('Failed to fetch news:', error);
+      }
+    };
+    
+    fetchNews();
+    const interval = setInterval(fetchNews, 60000);
+    return () => clearInterval(interval);
+  }, [selectedCountry]);
 
+  // Handle command submission
   const handleCommand = (cmd: string) => {
-    setCommandQuery(cmd);
-    setShowCommandResult(true);
-    setTimeout(() => setShowCommandResult(false), 4000);
+    if (cmd.startsWith('/newsnow')) {
+      const country = parseCountryFromPrompt(cmd);
+      if (country) {
+        setSelectedCountry(country);
+        setMapCenter([country.lat, country.lng]);
+      }
+    }
   };
 
-  const handleFilterChange = useCallback((filter: string) => {
-    setSelectedFilters(prev =>
-      prev.includes(filter)
+  const mockEarthquakes: EarthquakeData[] = [
+    { id: '1', location: 'Near Iran-Iraq Border', magnitude: 4.8, depth: 12, timestamp: new Date(Date.now() - 1800000), lat: 33.8, lng: 45.9 },
+    { id: '2', location: 'Eastern Mediterranean', magnitude: 3.2, depth: 25, timestamp: new Date(Date.now() - 3600000), lat: 35.2, lng: 30.5 },
+    { id: '3', location: 'Northern Turkey', magnitude: 4.1, depth: 8, timestamp: new Date(Date.now() - 5400000), lat: 39.9, lng: 41.3 },
+  ];
+
+  const mockMetrics: EscalationMetric[] = [
+    { region: 'Middle East', level: 87, trend: 'up', change: 12 },
+    { region: 'Eastern Europe', level: 72, trend: 'stable', change: 0 },
+    { region: 'East Asia', level: 45, trend: 'down', change: -5 },
+    { region: 'Africa', level: 58, trend: 'up', change: 8 },
+  ];
+
+  const mockVideos: VideoFeed[] = [
+    { id: '1', title: 'Al Jazeera English - Live', source: 'Al Jazeera', embedUrl: 'https://www.youtube.com/embed/gCNeDWCI0vo?autoplay=1&mute=1', isLive: true },
+    { id: '2', title: 'Sky News - Live', source: 'Sky News', embedUrl: 'https://www.youtube.com/embed/9Auq9mYxFEE?autoplay=1&mute=1', isLive: true },
+    { id: '3', title: 'TRT World - Live', source: 'TRT World', embedUrl: 'https://www.youtube.com/embed/8ISV-K2cWeg?autoplay=1&mute=1', isLive: true },
+    { id: '4', title: 'FRANCE 24 - Live', source: 'FRANCE 24', embedUrl: 'https://www.youtube.com/embed/h3MuIUNCCzI?autoplay=1&mute=1', isLive: true },
+  ];
+
+  const toggleSatellite = () => setShowSatellite(!showSatellite);
+  const handleRefresh = () => setGdeltEvents([...gdeltEvents]);
+
+  const handleFilterChange = (filter: string) => {
+    setSelectedFilters(prev => 
+      prev.includes(filter) 
         ? prev.filter(f => f !== filter)
         : [...prev, filter]
     );
-  }, []);
-
-  const handleRefreshMap = () => {
-    setMapKey(prev => prev + 1);
-  };
-
-  const toggleSatellite = () => {
-    setShowSatellite(prev => !prev);
   };
 
   return (
-    <div className="h-screen flex flex-col bg-[#0a0c10] overflow-hidden">
+    <div className="flex flex-col h-screen bg-[#0a0c10] text-gray-100 overflow-hidden">
       <Header onCommand={handleCommand} />
-
-      {/* Command Result Toast */}
-      {showCommandResult && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50 bg-[#0f1115] border border-red-500/30 rounded-lg px-4 py-2.5 shadow-2xl">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            <div>
-              <div className="text-sm text-white">Processing: <span className="text-red-400">/{commandQuery}</span></div>
-              <div className="text-xs text-gray-500">Updating dashboard with latest intelligence...</div>
-            </div>
-          </div>
-        </div>
-      )}
-
       <StatsPanel />
-
-      <div className="flex-1 flex overflow-hidden">
+      
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Sidebar */}
         <Sidebar selectedFilters={selectedFilters} onFilterChange={handleFilterChange} />
-
-        {/* Main Content - Single Map */}
-        <main className="flex-1 bg-[#0a0c10] relative">
-          <WorldMap
-            key={mapKey}
+        
+        {/* Main Map */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <WorldMap 
             events={gdeltEvents}
             selectedFilters={selectedFilters}
-            onRefresh={handleRefreshMap}
+            onRefresh={handleRefresh}
             showSatellite={showSatellite}
             toggleSatellite={toggleSatellite}
+            mapCenter={mapCenter}
           />
-        </main>
-
-        {/* Right Sidebar */}
-        <aside className="w-[320px] bg-[#0f1115] border-l border-[#1e2128] flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto custom-scrollbar">
-            <div className="space-y-px bg-[#1e2128]">
-              <NewsPanel news={mockNews} />
-              <VideoPanel videos={mockVideos} />
-              <EscalationPanel metrics={mockEscalationMetrics} />
-              <EarthquakePanel earthquakes={mockEarthquakes} />
-              <AISummaryPanel />
-            </div>
+        </div>
+      </div>
+      
+      {/* Bottom Panels */}
+      <div className="grid grid-cols-3 gap-px bg-[#1e2128] border-t border-[#1e2128] max-h-[420px]">
+        <NewsPanel news={filteredNews} />
+        <VideoPanel videos={mockVideos} />
+        <div className="grid grid-rows-2 gap-px bg-[#1e2128]">
+          <EscalationPanel metrics={mockMetrics} />
+          <div className="grid grid-cols-2 gap-px bg-[#1e2128]">
+            <EarthquakePanel earthquakes={mockEarthquakes} />
+            <AISummaryPanel />
           </div>
-        </aside>
+        </div>
       </div>
     </div>
   );
