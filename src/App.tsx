@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import Papa from 'papaparse';
 import { 
   Globe, 
   Newspaper, 
@@ -81,17 +82,12 @@ interface EscalationMetric {
   change: number;
 }
 
-// Mock Data
-const mockConflictEvents: ConflictEvent[] = [
-  { id: '1', lat: 31.5, lng: 34.8, title: 'Gaza Strip Conflict', type: 'conflict', severity: 'critical', timestamp: new Date(), description: 'Active military operations reported' },
-  { id: '2', lat: 33.8, lng: 35.5, title: 'Lebanon Border Tensions', type: 'conflict', severity: 'high', timestamp: new Date(Date.now() - 3600000), description: 'Cross-border artillery exchange' },
-  { id: '3', lat: 35.7, lng: 51.4, title: 'Iran Military Activity', type: 'political', severity: 'medium', timestamp: new Date(Date.now() - 7200000), description: 'Increased military presence detected' },
-  { id: '4', lat: 32.9, lng: 13.2, title: 'Libya Clashes', type: 'conflict', severity: 'high', timestamp: new Date(Date.now() - 10800000), description: 'Militia conflict in Tripoli' },
-  { id: '5', lat: 48.9, lng: 37.8, title: 'Ukraine Frontline', type: 'conflict', severity: 'critical', timestamp: new Date(Date.now() - 1800000), description: 'Heavy fighting reported' },
-  { id: '6', lat: 15.5, lng: 44.2, title: 'Yemen Airstrikes', type: 'conflict', severity: 'high', timestamp: new Date(Date.now() - 5400000), description: 'Coalition airstrikes in Sanaa' },
-  { id: '7', lat: 36.2, lng: 36.2, title: 'Syria Border Conflict', type: 'conflict', severity: 'medium', timestamp: new Date(Date.now() - 9000000), description: 'Turkish-Syrian border skirmishes' },
-  { id: '8', lat: 19.4, lng: -99.1, title: 'Mexico Cyber Attack', type: 'cyber', severity: 'medium', timestamp: new Date(Date.now() - 12600000), description: 'Government systems targeted' },
-];
+
+// GDELT CSV columns reference: https://blog.gdeltproject.org/gdelt-2-0-our-global-world-in-realtime/
+// [0]=GLOBALEVENTID, [53]=ActionGeo_Lat, [54]=ActionGeo_Long, [23]=EventCode, [26]=GoldsteinScale, [34]=Actor1Name, [51]=ActionGeo_CountryCode
+
+const GDELT_CSV_URL = 'http://data.gdeltproject.org/events/last15minutes.csv';
+
 
 const mockNews: NewsItem[] = [
   { id: '1', title: 'Israel launches targeted strikes on Gaza militant positions', source: 'Reuters', timestamp: new Date(Date.now() - 300000), category: 'Conflict', severity: 'critical', url: 'https://www.reuters.com/world/middle-east/' },
@@ -735,33 +731,87 @@ function App() {
   const [commandQuery, setCommandQuery] = useState('');
   const [showSatellite, setShowSatellite] = useState(false);
   const [mapKey, setMapKey] = useState(0);
-  
+  const [gdeltEvents, setGdeltEvents] = useState<ConflictEvent[]>([]);
+
+  // Fetch GDELT CSV and parse to ConflictEvent[]
+  useEffect(() => {
+    fetch(GDELT_CSV_URL)
+      .then(res => res.text())
+      .then(csv => {
+        Papa.parse(csv, {
+          complete: (results) => {
+            // Each row is an array of columns
+            const events: ConflictEvent[] = (results.data as string[][])
+              .filter(row => row.length > 54 && row[53] && row[54])
+              .map((row, idx) => ({
+                id: row[0] || `gdelt-${idx}`,
+                lat: parseFloat(row[53]),
+                lng: parseFloat(row[54]),
+                title: row[34] || 'Unknown', // Actor1Name
+                type: parseEventType(row[23]), // EventCode
+                severity: parseSeverity(row[26]), // GoldsteinScale
+                timestamp: parseGdeltDate(row[1]), // SQLDATE
+                description: row[57] || row[34] || 'Event', // ActionGeo_FullName or Actor1Name
+              }));
+            setGdeltEvents(events);
+          },
+          skipEmptyLines: true,
+        });
+      });
+  }, [mapKey]); // refetch on refresh
+
+  // Helper: map GDELT EventCode to type
+  function parseEventType(code: string): 'conflict' | 'earthquake' | 'cyber' | 'political' {
+    if (!code) return 'conflict';
+    if (code.startsWith('1')) return 'political';
+    if (code.startsWith('2')) return 'conflict';
+    if (code.startsWith('3')) return 'conflict';
+    if (code.startsWith('7')) return 'cyber';
+    return 'conflict';
+  }
+  // Helper: map GoldsteinScale to severity
+  function parseSeverity(scale: string): 'critical' | 'high' | 'medium' | 'low' {
+    const val = parseFloat(scale);
+    if (val >= 5) return 'critical';
+    if (val >= 2) return 'high';
+    if (val >= 0) return 'medium';
+    return 'low';
+  }
+  // Helper: parse GDELT SQLDATE (yyyymmdd)
+  function parseGdeltDate(sqlDate: string): Date {
+    if (!sqlDate || sqlDate.length !== 8) return new Date();
+    const y = +sqlDate.slice(0, 4);
+    const m = +sqlDate.slice(4, 6) - 1;
+    const d = +sqlDate.slice(6, 8);
+    return new Date(y, m, d);
+  }
+
   const handleCommand = (cmd: string) => {
     setCommandQuery(cmd);
     setShowCommandResult(true);
     setTimeout(() => setShowCommandResult(false), 4000);
   };
-  
+
   const handleFilterChange = useCallback((filter: string) => {
-    setSelectedFilters(prev => 
-      prev.includes(filter) 
+    setSelectedFilters(prev =>
+      prev.includes(filter)
         ? prev.filter(f => f !== filter)
         : [...prev, filter]
     );
   }, []);
-  
+
   const handleRefreshMap = () => {
     setMapKey(prev => prev + 1);
   };
-  
+
   const toggleSatellite = () => {
     setShowSatellite(prev => !prev);
   };
-  
+
   return (
     <div className="h-screen flex flex-col bg-[#0a0c10] overflow-hidden">
       <Header onCommand={handleCommand} />
-      
+
       {/* Command Result Toast */}
       {showCommandResult && (
         <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50 bg-[#0f1115] border border-red-500/30 rounded-lg px-4 py-2.5 shadow-2xl">
@@ -774,24 +824,24 @@ function App() {
           </div>
         </div>
       )}
-      
+
       <StatsPanel />
-      
+
       <div className="flex-1 flex overflow-hidden">
         <Sidebar selectedFilters={selectedFilters} onFilterChange={handleFilterChange} />
-        
+
         {/* Main Content - Single Map */}
         <main className="flex-1 bg-[#0a0c10] relative">
-          <WorldMap 
+          <WorldMap
             key={mapKey}
-            events={mockConflictEvents} 
+            events={gdeltEvents}
             selectedFilters={selectedFilters}
             onRefresh={handleRefreshMap}
             showSatellite={showSatellite}
             toggleSatellite={toggleSatellite}
           />
         </main>
-        
+
         {/* Right Sidebar */}
         <aside className="w-[320px] bg-[#0f1115] border-l border-[#1e2128] flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto custom-scrollbar">
