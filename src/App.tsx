@@ -83,8 +83,12 @@ function getSeverityFromGoldstein(scale: number): 'critical' | 'high' | 'medium'
 // Helper function to get event type
 function getEventType(eventCode: string): 'conflict' | 'earthquake' | 'cyber' | 'political' {
   const code = parseInt(eventCode);
+  // Conflict events: 190-195 (WEIS categories)
   if (code >= 190 && code <= 195) return 'conflict';
-  if (code >= 10 && code <= 13) return 'political';
+  if (code >= 170 && code <= 189) return 'conflict';
+  // Political events: 010-013, 020-024, etc
+  if ((code >= 10 && code <= 15) || (code >= 20 && code <= 24) || (code >= 30 && code <= 34)) return 'political';
+  // Use goldstein scale as fallback: high negative = conflict
   return 'conflict';
 }
 
@@ -129,7 +133,7 @@ const createCustomIcon = (severity: string, type: string) => {
 };
 
 // Components
-function Header({ onCommand }: { onCommand: (cmd: string) => void }) {
+function Header({ onCommand, eventCount }: { onCommand: (cmd: string) => void; eventCount: number }) {
   const [command, setCommand] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
   
@@ -147,27 +151,30 @@ function Header({ onCommand }: { onCommand: (cmd: string) => void }) {
   };
   
   return (
-    <header className="h-12 bg-[#0a0c10] border-b border-[#1e2128] flex items-center px-4 shrink-0">
+    <header className="h-12 bg-gradient-to-r from-[#0a0c10] via-[#0f1115] to-[#0a0c10] border-b border-[#2a2f3a] flex items-center px-4 shrink-0 shadow-lg shadow-red-500/5">
       <div className="flex items-center gap-3">
-        <Globe className="w-5 h-5 text-red-500" />
-        <span className="font-bold text-white tracking-wide text-sm">FIRD-GEOPOLITICS</span>
-        <span className="text-xs text-gray-600">v2.4.1</span>
+        <div className="relative">
+          <Globe className="w-5 h-5 text-red-500 animate-spin" style={{animationDuration: '6s'}} />
+          <div className="absolute inset-0 bg-red-500 blur-md opacity-20 rounded-full" />
+        </div>
+        <span className="font-black text-white tracking-widest text-sm" style={{textShadow: '0 0 20px rgba(239, 68, 68, 0.3)'}}>GEOPOLITICAL INTELLIGENCE</span>
+        <span className="text-xs text-red-500 font-bold ml-2 px-2 py-1 bg-red-500/10 border border-red-500/30 rounded">v3.0 LIVE</span>
       </div>
       
-      <div className="h-5 w-px bg-[#1e2128] mx-4" />
+      <div className="h-6 w-px bg-gradient-to-b from-transparent via-[#2a2f3a] to-transparent mx-4" />
       
-      <form onSubmit={handleSubmit} className="flex items-center gap-2 bg-[#15181e] border border-[#2a2f3a] rounded px-3 py-1.5 flex-1 max-w-lg">
+      <form onSubmit={handleSubmit} className="flex items-center gap-2 bg-[#15181e]/60 border border-[#2a2f3a] rounded px-3 py-1.5 flex-1 max-w-lg backdrop-blur-sm hover:border-[#3a3f4a] transition-colors">
         <Command className="w-3.5 h-3.5 text-red-500" />
-        <span className="text-red-500 text-xs font-mono">/</span>
+        <span className="text-red-500 text-xs font-mono font-bold">$</span>
         <input
           type="text"
           value={command}
           onChange={(e) => setCommand(e.target.value)}
-          placeholder="newsnow [COUNTRY NAME]"
-          className="bg-transparent border-none outline-none text-xs w-full text-gray-300 placeholder:text-gray-600"
+          placeholder="search location or /newsnow [COUNTRY]"
+          className="bg-transparent border-none outline-none text-xs w-full text-gray-300 placeholder:text-gray-600 font-mono"
         />
         {command && (
-          <button type="submit" className="text-gray-500 hover:text-white">
+          <button type="submit" className="text-gray-500 hover:text-red-500 transition-colors">
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         )}
@@ -176,17 +183,22 @@ function Header({ onCommand }: { onCommand: (cmd: string) => void }) {
       <div className="flex items-center gap-6 ml-auto">
         <div className="flex items-center gap-2 text-xs">
           <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-          <span className="text-gray-400">LIVE</span>
+          <span className="text-gray-400 font-medium">MONITORING</span>
+          <span className="text-green-500 font-bold ml-2">{eventCount} EVENTS</span>
         </div>
         
-        <div className="flex items-center gap-2 text-xs text-gray-500">
+        <div className="h-4 w-px bg-[#1e2128]" />
+        
+        <div className="flex items-center gap-2 text-xs text-gray-400">
           <Clock className="w-3 h-3" />
           <span className="font-mono">{format(currentTime, 'HH:mm:ss')} UTC</span>
         </div>
         
+        <div className="h-4 w-px bg-[#1e2128]" />
+        
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-gray-500">Data Sources:</span>
-          <span className="text-green-500 font-mono">12 ACTIVE</span>
+          <span className="text-gray-500">SOURCES:</span>
+          <span className="text-green-500 font-bold">● GDELT ● NEWSAPI ● LIVE</span>
         </div>
       </div>
     </header>
@@ -195,25 +207,34 @@ function Header({ onCommand }: { onCommand: (cmd: string) => void }) {
 
 function StatsPanel() {
   const stats = [
-    { label: 'ACTIVE CONFLICTS', value: '47', change: '+3' },
-    { label: 'EVENTS (24H)', value: '1289', change: '+156' },
-    { label: 'DATA POINTS', value: '2.4M', change: '+12' },
-    { label: 'SOURCES', value: '12', change: '' },
+    { label: 'CONFLICT ZONES', value: '47', icon: Target, change: '+3', color: 'red' },
+    { label: 'EVENTS (LIVE)', value: '1289', icon: Zap, change: '+156', color: 'orange' },
+    { label: 'COUNTRIES', value: '195', icon: Globe, change: '100%', color: 'blue' },
+    { label: 'THREATS', value: 'HIGH', icon: AlertTriangle, change: '↑', color: 'red' },
   ];
   
   return (
-    <div className="grid grid-cols-4 gap-px bg-[#1e2128]">
-      {stats.map((stat) => (
-        <div key={stat.label} className="bg-[#0f1115] p-3">
-          <div className="text-[10px] text-gray-500 font-medium tracking-wider">{stat.label}</div>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-xl font-bold text-white">{stat.value}</span>
-            {stat.change && (
-              <span className="text-xs text-red-400 font-medium">{stat.change}</span>
-            )}
+    <div className="grid grid-cols-4 gap-px bg-gradient-to-r from-[#1e2128]/50 via-[#2a2f3a]/50 to-[#1e2128]/50 border-b border-[#2a2f3a]/50">
+      {stats.map((stat) => {
+        const Icon = stat.icon;
+        const colorClass = stat.color === 'red' ? 'text-red-500' : stat.color === 'orange' ? 'text-orange-500' : 'text-blue-500';
+        return (
+          <div key={stat.label} className="bg-[#0a0c10] p-3 border-r border-[#1e2128] hover:bg-[#15181e]/50 transition-colors group">
+            <div className="flex items-center gap-2 mb-1">
+              <Icon className={`w-3.5 h-3.5 ${colorClass}`} />
+              <div className="text-[9px] text-gray-500 font-bold tracking-wider">{stat.label}</div>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-lg font-black text-white group-hover:text-red-500 transition-colors">{stat.value}</span>
+              {stat.change && (
+                <span className={`text-[10px] font-bold ${stat.change.startsWith('+') || stat.change === '↑' ? 'text-red-500' : 'text-green-500'}`}>
+                  {stat.change}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -223,10 +244,10 @@ function Sidebar({ selectedFilters, onFilterChange }: {
   onFilterChange: (filter: string) => void;
 }) {
   const filters = [
-    { id: 'conflict', label: 'Conflict Zones', icon: Target, color: 'red' },
-    { id: 'earthquake', label: 'Earthquakes', icon: Activity, color: 'orange' },
-    { id: 'cyber', label: 'Cyber Attacks', icon: Cpu, color: 'purple' },
-    { id: 'political', label: 'Political', icon: Shield, color: 'blue' },
+    { id: 'conflict', label: 'Conflict Zones', icon: Target, color: 'red', badge: 'CONFLICT' },
+    { id: 'earthquake', label: 'Earthquakes', icon: Activity, color: 'orange', badge: 'GEMPA' },
+    { id: 'cyber', label: 'Cyber Attacks', icon: Cpu, color: 'purple', badge: 'CYBER' },
+    { id: 'political', label: 'Political', icon: Shield, color: 'blue', badge: 'POLITIK' },
   ];
   
   const dataSources = [
@@ -239,55 +260,94 @@ function Sidebar({ selectedFilters, onFilterChange }: {
   ];
   
   return (
-    <aside className="w-[220px] bg-[#0f1115] border-r border-[#1e2128] flex flex-col h-full overflow-hidden">
-      <div className="p-3 border-b border-[#1e2128]">
-        <div className="flex items-center gap-2 text-xs font-medium text-gray-400">
-          <Filter className="w-3.5 h-3.5" />
-          <span>FILTERS</span>
+    <aside className="w-[220px] border-r border-[#1e2128] flex flex-col h-full overflow-hidden" style={{
+      background: 'linear-gradient(180deg, rgba(10,12,16,0.9) 0%, rgba(15,17,21,0.8) 100%)',
+      borderRightColor: 'rgba(75, 85, 99, 0.2)'
+    }}>
+      {/* Filter Section */}
+      <div className="p-3 border-b" style={{ borderBottomColor: 'rgba(75, 85, 99, 0.2)' }}>
+        <div className="flex items-center gap-2 text-xs font-bold text-gray-300">
+          <Filter className="w-3.5 h-3.5 text-red-400" />
+          <span className="tracking-wider">EVENT FILTERS</span>
         </div>
       </div>
       
-      <div className="p-2 space-y-1">
+      <div className="p-2.5 space-y-2">
         {filters.map((filter) => {
           const Icon = filter.icon;
           const isSelected = selectedFilters.includes(filter.id);
+          const colorMap: any = {
+            red: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.4)', text: '#fca5a5', icon: '#ef4444' },
+            orange: { bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.4)', text: '#fed7aa', icon: '#f97316' },
+            purple: { bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.4)', text: '#d8b4fe', icon: '#a855f7' },
+            blue: { bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.4)', text: '#93c5fd', icon: '#3b82f6' },
+          };
+          
+          const colors = colorMap[filter.color];
+          
           return (
             <button
               key={filter.id}
               onClick={() => onFilterChange(filter.id)}
-              className={cn(
-                "w-full flex items-center gap-2.5 px-3 py-2 rounded text-xs transition-all",
-                isSelected 
-                  ? "bg-red-500/15 text-red-400 border border-red-500/30"
-                  : "bg-transparent text-gray-400 border border-transparent hover:bg-[#15181e] hover:text-gray-300"
-              )}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-300 group"
+              style={{
+                background: isSelected ? colors.bg : 'rgba(75, 85, 99, 0.05)',
+                border: `1px solid ${isSelected ? colors.border : 'rgba(75, 85, 99, 0.15)'}`,
+                color: isSelected ? colors.text : '#9ca3af',
+              }}
+              onMouseEnter={(e) => {
+                if (!isSelected) {
+                  e.currentTarget.style.background = 'rgba(75, 85, 99, 0.1)';
+                  e.currentTarget.style.borderColor = 'rgba(75, 85, 99, 0.25)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isSelected) {
+                  e.currentTarget.style.background = 'rgba(75, 85, 99, 0.05)';
+                  e.currentTarget.style.borderColor = 'rgba(75, 85, 99, 0.15)';
+                }
+              }}
             >
-              <Icon className="w-3.5 h-3.5" />
-              <span>{filter.label}</span>
-              {isSelected && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-red-500" />}
+              <Icon className="w-4 h-4 flex-shrink-0" style={{ color: isSelected ? colors.icon : 'inherit' }} />
+              <div className="flex-1 text-left">
+                <div>{filter.label}</div>
+                <div className="text-[9px] opacity-60 font-normal">{filter.badge}</div>
+              </div>
+              {isSelected && (
+                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: colors.icon }} />
+              )}
             </button>
           );
         })}
       </div>
       
+      {/* Data Sources Section */}
       <div className="mt-auto">
-        <div className="p-3 border-t border-b border-[#1e2128]">
-          <div className="flex items-center gap-2 text-xs font-medium text-gray-400">
-            <Database className="w-3.5 h-3.5" />
-            <span>DATA SOURCES</span>
+        <div className="p-3 border-t border-b" style={{ borderColor: 'rgba(75, 85, 99, 0.2)' }}>
+          <div className="flex items-center gap-2 text-xs font-bold text-gray-300">
+            <Database className="w-3.5 h-3.5 text-blue-400" />
+            <span className="tracking-wider">DATA SOURCES</span>
           </div>
         </div>
         
-        <div className="p-2 space-y-1">
+        <div className="p-2.5 space-y-1.5 max-h-[200px] overflow-y-auto custom-scrollbar">
           {dataSources.map((source) => (
-            <div key={source.name} className="flex items-center justify-between text-[10px] py-1">
-              <span className="text-gray-500">{source.name}</span>
-              <span className={cn(
-                "px-1.5 py-0.5 rounded font-mono text-[9px]",
-                source.status === 'active' ? "bg-green-500/15 text-green-400" : "bg-yellow-500/15 text-yellow-400"
-              )}>
-                {source.latency}
-              </span>
+            <div key={source.name} className="px-2.5 py-1.5 rounded-md transition-all duration-300" style={{
+              background: 'rgba(75, 85, 99, 0.05)',
+              border: '1px solid rgba(75, 85, 99, 0.15)',
+            }}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-1">
+                  <div className={source.status === 'active' ? 'status-active' : 'status-warning'} />
+                  <span className="text-[10px] font-medium text-gray-400">{source.name}</span>
+                </div>
+                <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold leading-none" style={{
+                  background: source.status === 'active' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(249, 115, 22, 0.15)',
+                  color: source.status === 'active' ? '#6ee7b7' : '#fed7aa',
+                }}>
+                  {source.latency}
+                </span>
+              </div>
             </div>
           ))}
         </div>
@@ -340,23 +400,28 @@ function WorldMap({
             icon={createCustomIcon(event.severity, event.type)}
           >
             <Popup>
-              <div className="bg-[#0f1115] border border-[#1e2128] rounded p-3 min-w-[180px]">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={cn(
-                    "px-1.5 py-0.5 rounded text-[10px] font-medium",
-                    event.severity === 'critical' && "bg-red-500/20 text-red-400",
-                    event.severity === 'high' && "bg-orange-500/20 text-orange-400",
-                    event.severity === 'medium' && "bg-yellow-500/20 text-yellow-400",
-                    event.severity === 'low' && "bg-green-500/20 text-green-400",
-                  )}>
+              <div className="rounded p-4 min-w-[220px]" style={{
+                background: 'linear-gradient(135deg, rgba(10,12,16,0.95) 0%, rgba(15,17,21,0.95) 100%)',
+                border: '1px solid rgba(75, 85, 99, 0.3)',
+              }}>
+                <div className="flex items-center gap-2 mb-2.5">
+                  <span className="px-2 py-1 rounded text-[10px] font-bold" style={{
+                    background: event.severity === 'critical' ? 'rgba(239, 68, 68, 0.2)' :
+                               event.severity === 'high' ? 'rgba(249, 115, 22, 0.2)' :
+                               event.severity === 'medium' ? 'rgba(234, 179, 8, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                    color: event.severity === 'critical' ? '#fca5a5' :
+                           event.severity === 'high' ? '#fed7aa' :
+                           event.severity === 'medium' ? '#fef08a' : '#a7f3d0',
+                  }}>
                     {event.severity.toUpperCase()}
                   </span>
-                  <span className="text-[10px] text-gray-500 uppercase">{event.type}</span>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{event.type}</span>
                 </div>
-                <h3 className="text-sm font-medium text-white mb-1">{event.title}</h3>
-                <p className="text-xs text-gray-400 mb-2">{event.description}</p>
-                <div className="text-[10px] text-gray-500 font-mono">
-                  {format(event.timestamp, 'HH:mm')} UTC
+                <h3 className="text-sm font-bold text-white mb-1.5">{event.title}</h3>
+                <p className="text-xs text-gray-300 mb-2.5">{event.description}</p>
+                <div className="flex items-center gap-2 text-[10px] text-gray-500 font-mono">
+                  <Clock className="w-3 h-3" />
+                  {format(event.timestamp, 'HH:mm:ss')} UTC
                 </div>
               </div>
             </Popup>
@@ -365,52 +430,114 @@ function WorldMap({
       </MapContainer>
       
       {/* Map Controls */}
-      <div className="absolute top-3 right-3 z-[400] flex flex-col gap-1.5">
+      <div className="absolute top-4 right-4 z-[400] flex flex-col gap-2">
         <button 
           onClick={onRefresh}
-          className="w-8 h-8 bg-[#0f1115] border border-[#1e2128] rounded flex items-center justify-center hover:bg-[#15181e] hover:border-[#2a2f3a] transition-colors"
+          className="w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-300 hover:shadow-lg"
+          style={{
+            background: 'linear-gradient(135deg, rgba(15,17,21,0.9) 0%, rgba(10,12,16,0.8) 100%)',
+            border: '1px solid rgba(75, 85, 99, 0.3)',
+            color: '#9ca3af'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(15,17,21,0.95) 0%, rgba(10,12,16,0.9) 100%)';
+            e.currentTarget.style.borderColor = 'rgba(75, 85, 99, 0.5)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(15,17,21,0.9) 0%, rgba(10,12,16,0.8) 100%)';
+            e.currentTarget.style.borderColor = 'rgba(75, 85, 99, 0.3)';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
           title="Refresh Map"
         >
-          <RefreshCw className="w-3.5 h-3.5 text-gray-400" />
+          <RefreshCw className="w-4 h-4" />
         </button>
         <button 
           onClick={toggleSatellite}
-          className={cn(
-            "w-8 h-8 border rounded flex items-center justify-center transition-colors",
-            showSatellite 
-              ? "bg-blue-500/20 border-blue-500/50 text-blue-400" 
-              : "bg-[#0f1115] border-[#1e2128] hover:bg-[#15181e] hover:border-[#2a2f3a]"
-          )}
+          className="w-9 h-9 border rounded-lg flex items-center justify-center transition-all duration-300"
+          style={{
+            background: showSatellite ? 'rgba(59, 130, 246, 0.2)' : 'linear-gradient(135deg, rgba(15,17,21,0.9) 0%, rgba(10,12,16,0.8) 100%)',
+            borderColor: showSatellite ? 'rgba(59, 130, 246, 0.5)' : 'rgba(75, 85, 99, 0.3)',
+            color: showSatellite ? '#93c5fd' : '#9ca3af',
+            boxShadow: showSatellite ? '0 0 15px rgba(59, 130, 246, 0.3)' : 'none'
+          }}
+          onMouseEnter={(e) => {
+            if (!showSatellite) {
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(15,17,21,0.95) 0%, rgba(10,12,16,0.9) 100%)';
+              e.currentTarget.style.borderColor = 'rgba(75, 85, 99, 0.5)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!showSatellite) {
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(15,17,21,0.9) 0%, rgba(10,12,16,0.8) 100%)';
+              e.currentTarget.style.borderColor = 'rgba(75, 85, 99, 0.3)';
+              e.currentTarget.style.boxShadow = 'none';
+            }
+          }}
           title="Toggle Satellite View"
         >
-          <Satellite className="w-3.5 h-3.5 text-gray-400" />
+          <Satellite className="w-4 h-4" />
         </button>
         <button 
-          className="w-8 h-8 bg-[#0f1115] border border-[#1e2128] rounded flex items-center justify-center hover:bg-[#15181e] hover:border-[#2a2f3a] transition-colors"
+          className="w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-300 hover:shadow-lg"
+          style={{
+            background: 'linear-gradient(135deg, rgba(15,17,21,0.9) 0%, rgba(10,12,16,0.8) 100%)',
+            border: '1px solid rgba(75, 85, 99, 0.3)',
+            color: '#9ca3af'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(15,17,21,0.95) 0%, rgba(10,12,16,0.9) 100%)';
+            e.currentTarget.style.borderColor = 'rgba(75, 85, 99, 0.5)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(15,17,21,0.9) 0%, rgba(10,12,16,0.8) 100%)';
+            e.currentTarget.style.borderColor = 'rgba(75, 85, 99, 0.3)';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
           title="Toggle Markers"
         >
-          <Eye className="w-3.5 h-3.5 text-gray-400" />
+          <Eye className="w-4 h-4" />
         </button>
       </div>
       
       {/* Legend */}
-      <div className="absolute bottom-3 left-3 z-[400] bg-[#0f1115]/95 border border-[#1e2128] rounded p-2.5">
-        <div className="text-[10px] font-medium text-gray-500 mb-2 uppercase tracking-wider">Legend</div>
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+      <div className="absolute bottom-4 left-4 z-[400] rounded-lg p-3" style={{
+        background: 'linear-gradient(135deg, rgba(15,17,21,0.95) 0%, rgba(10,12,16,0.85) 100%)',
+        border: '1px solid rgba(75, 85, 99, 0.25)',
+        backdropFilter: 'blur(10px)',
+        boxShadow: '0 8px 16px rgba(0, 0, 0, 0.3)',
+      }}>
+        <div className="text-[10px] font-bold text-gray-300 mb-2.5 uppercase tracking-wider">Event Severity</div>
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2.5">
+            <div className="w-2 h-2 rounded-full" style={{
+              background: '#ef4444',
+              boxShadow: '0 0 8px rgba(239, 68, 68, 0.6)'
+            }} />
             <span className="text-[10px] text-gray-400">Critical</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />
+          <div className="flex items-center gap-2.5">
+            <div className="w-2 h-2 rounded-full" style={{
+              background: '#f97316',
+              boxShadow: '0 0 8px rgba(249, 115, 22, 0.6)'
+            }} />
             <span className="text-[10px] text-gray-400">High</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+          <div className="flex items-center gap-2.5">
+            <div className="w-2 h-2 rounded-full" style={{
+              background: '#eab308',
+              boxShadow: '0 0 8px rgba(234, 179, 8, 0.6)'
+            }} />
             <span className="text-[10px] text-gray-400">Medium</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+          <div className="flex items-center gap-2.5">
+            <div className="w-2 h-2 rounded-full" style={{
+              background: '#10b981',
+              boxShadow: '0 0 8px rgba(16, 185, 129, 0.6)'
+            }} />
             <span className="text-[10px] text-gray-400">Low</span>
           </div>
         </div>
@@ -421,13 +548,20 @@ function WorldMap({
 
 function NewsPanel({ news }: { news: NewsItem[] }) {
   return (
-    <div className="flex flex-col h-[280px] bg-[#0f1115]">
-      <div className="p-2.5 border-b border-[#1e2128] flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs font-medium text-gray-300">
-          <Newspaper className="w-3.5 h-3.5" />
+    <div className="flex flex-col h-[280px]" style={{
+      background: 'linear-gradient(180deg, rgba(15,17,21,0.8) 0%, rgba(10,12,16,0.6) 100%)',
+      border: '1px solid rgba(75, 85, 99, 0.2)',
+      borderRadius: '8px',
+    }}>
+      <div className="p-3 border-b flex items-center justify-between" style={{ borderBottomColor: 'rgba(75, 85, 99, 0.2)' }}>
+        <div className="flex items-center gap-2 text-xs font-bold text-gray-200 tracking-wider">
+          <Newspaper className="w-4 h-4 text-amber-400" />
           <span>LIVE NEWS FEED</span>
         </div>
-        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full status-error" />
+          <span className="text-[9px] text-gray-500 font-mono">LIVE</span>
+        </div>
       </div>
       
       <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -438,25 +572,31 @@ function NewsPanel({ news }: { news: NewsItem[] }) {
               href={item.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="block p-2.5 border-b border-[#1e2128] hover:bg-[#15181e] transition-colors group"
+              className="block px-3 py-2.5 transition-all duration-300 group hover:bg-[rgba(75,85,99,0.1)]"
+              style={{
+                borderBottom: '1px solid rgba(75, 85, 99, 0.15)',
+              }}
             >
-              <div className="flex items-start gap-2">
-                <span className={cn(
-                  "px-1.5 py-0.5 rounded text-[9px] font-medium shrink-0 mt-0.5",
-                  item.severity === 'critical' && "bg-red-500/20 text-red-400",
-                  item.severity === 'high' && "bg-orange-500/20 text-orange-400",
-                  item.severity === 'medium' && "bg-yellow-500/20 text-yellow-400",
-                  item.severity === 'low' && "bg-green-500/20 text-green-400",
-                )}>
-                  {item.category}
-                </span>
+              <div className="flex items-start gap-2.5">
+                <div className="flex-shrink-0 mt-0.5">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold" style={{
+                    background: item.severity === 'critical' ? 'rgba(239, 68, 68, 0.2)' : 
+                               item.severity === 'high' ? 'rgba(249, 115, 22, 0.2)' :
+                               item.severity === 'medium' ? 'rgba(234, 179, 8, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                    color: item.severity === 'critical' ? '#fca5a5' : 
+                           item.severity === 'high' ? '#fed7aa' :
+                           item.severity === 'medium' ? '#fef08a' : '#a7f3d0',
+                  }}>
+                    {item.category}
+                  </span>
+                </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-xs text-gray-200 leading-snug mb-1 line-clamp-2 group-hover:text-white transition-colors">{item.title}</h4>
-                  <div className="flex items-center gap-2 text-[10px] text-gray-500">
-                    <span>{item.source}</span>
-                    <span>•</span>
-                    <span>{format(item.timestamp, 'HH:mm')}</span>
-                    <ExternalLink className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <h4 className="text-xs text-gray-100 leading-snug mb-1.5 line-clamp-2 group-hover:text-white transition-colors font-semibold">{item.title}</h4>
+                  <div className="flex items-center gap-1.5 text-[9px] text-gray-500">
+                    <span className="font-medium text-gray-400">{item.source}</span>
+                    <span className="opacity-50">•</span>
+                    <span className="font-mono">{format(item.timestamp, 'HH:mm')}</span>
+                    <ExternalLink className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-gray-400" />
                   </div>
                 </div>
               </div>
@@ -472,21 +612,28 @@ function NewsPanel({ news }: { news: NewsItem[] }) {
 
 function VideoPanel({ videos }: { videos: VideoFeed[] }) {
   return (
-    <div className="flex flex-col bg-[#0f1115]">
-      <div className="p-2.5 border-b border-[#1e2128] flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs font-medium text-gray-300">
-          <Video className="w-3.5 h-3.5" />
+    <div className="flex flex-col" style={{
+      background: 'linear-gradient(180deg, rgba(15,17,21,0.8) 0%, rgba(10,12,16,0.6) 100%)',
+      border: '1px solid rgba(75, 85, 99, 0.2)',
+      borderRadius: '8px',
+    }}>
+      <div className="p-3 border-b flex items-center justify-between" style={{ borderBottomColor: 'rgba(75, 85, 99, 0.2)' }}>
+        <div className="flex items-center gap-2 text-xs font-bold text-gray-200 tracking-wider">
+          <Video className="w-4 h-4 text-red-400" />
           <span>LIVE VIDEO FEEDS</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-gray-500">{videos.length} ACTIVE</span>
-          <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          <span className="text-[9px] font-mono text-gray-400">{videos.length} ACTIVE</span>
+          <div className="w-2 h-2 rounded-full status-error" />
         </div>
       </div>
-      <div className="p-2 grid grid-cols-2 gap-2">
+      <div className="p-2.5 grid grid-cols-2 gap-2">
         {videos.length > 0 ? (
           videos.map((video) => (
-            <div key={video.id} className="relative bg-[#0a0c10] rounded overflow-hidden group">
+            <div key={video.id} className="relative rounded-lg overflow-hidden group" style={{
+              background: 'rgba(10, 12, 16, 0.8)',
+              border: '1px solid rgba(75, 85, 99, 0.2)',
+            }}>
               <div className="aspect-video relative">
                 <iframe
                   src={video.embedUrl}
@@ -495,12 +642,12 @@ function VideoPanel({ videos }: { videos: VideoFeed[] }) {
                   allow="autoplay; encrypted-media"
                   allowFullScreen
                 />
-                <div className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/60 rounded px-1.5 py-0.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  <span className="text-[9px] font-medium text-white">LIVE</span>
+                <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-black/70 rounded-md px-2 py-1 backdrop-blur-sm">
+                  <div className="w-1.5 h-1.5 rounded-full status-error" />
+                  <span className="text-[10px] font-bold text-white">LIVE</span>
                 </div>
-                <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/80 to-transparent">
-                  <div className="text-[9px] text-white/90 truncate">{video.source}</div>
+                <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+                  <div className="text-[9px] text-white/90 truncate font-semibold">{video.source}</div>
                 </div>
               </div>
             </div>
@@ -525,24 +672,32 @@ function EscalationPanel({ metrics }: { metrics: EscalationMetric[] }) {
   ];
 
   return (
-    <div className="flex flex-col bg-[#0f1115]">
-      <div className="p-2.5 border-b border-[#1e2128] flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs font-medium text-gray-300">
-          <TrendingUp className="w-3.5 h-3.5" />
+    <div className="flex flex-col" style={{
+      background: 'linear-gradient(180deg, rgba(15,17,21,0.8) 0%, rgba(10,12,16,0.6) 100%)',
+      border: '1px solid rgba(75, 85, 99, 0.2)',
+      borderRadius: '8px',
+    }}>
+      <div className="p-3 border-b flex items-center justify-between" style={{ borderBottomColor: 'rgba(75, 85, 99, 0.2)' }}>
+        <div className="flex items-center gap-2 text-xs font-bold text-gray-200 tracking-wider">
+          <TrendingUp className="w-4 h-4 text-red-400" />
           <span>ESCALATION INDEX</span>
         </div>
-        <span className="text-[10px] text-gray-500">24H</span>
+        <span className="text-[9px] font-mono text-gray-500 bg-red-500/10 px-2 py-1 rounded">24H</span>
       </div>
       
-      <div className="p-2.5 space-y-2.5">
+      <div className="p-3 space-y-3">
         {metrics.map((metric) => (
-          <div key={metric.region} className="space-y-1">
+          <div key={metric.region} className="space-y-1.5">
             <div className="flex items-center justify-between text-[10px]">
-              <span className="text-gray-400">{metric.region}</span>
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono font-medium text-white">{metric.level}</span>
+              <span className="font-semibold text-gray-300">{metric.region}</span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-bold text-white" style={{
+                  color: metric.level >= 80 ? '#fca5a5' : 
+                         metric.level >= 60 ? '#fed7aa' :
+                         metric.level >= 40 ? '#fef08a' : '#a7f3d0'
+                }}>{metric.level}</span>
                 <span className={cn(
-                  "flex items-center gap-0.5 text-[9px]",
+                  "flex items-center gap-0.5 text-[9px] font-semibold",
                   metric.trend === 'up' && "text-red-400",
                   metric.trend === 'down' && "text-green-400",
                   metric.trend === 'stable' && "text-gray-500",
@@ -553,27 +708,34 @@ function EscalationPanel({ metrics }: { metrics: EscalationMetric[] }) {
                 </span>
               </div>
             </div>
-            <div className="h-1.5 rounded-full overflow-hidden bg-[#1e2128]">
+            <div className="h-2 rounded-lg overflow-hidden" style={{ background: 'rgba(75, 85, 99, 0.1)' }}>
               <div 
-                className={cn(
-                  "h-full rounded-full transition-all duration-500",
-                  metric.level >= 80 && "bg-gradient-to-r from-red-600 to-red-400",
-                  metric.level >= 60 && metric.level < 80 && "bg-gradient-to-r from-orange-600 to-orange-400",
-                  metric.level >= 40 && metric.level < 60 && "bg-gradient-to-r from-yellow-600 to-yellow-400",
-                  metric.level < 40 && "bg-gradient-to-r from-green-600 to-green-400",
-                )}
-                style={{ width: `${metric.level}%` }}
+                className="h-full rounded-lg transition-all duration-500"
+                style={{
+                  width: `${metric.level}%`,
+                  background: metric.level >= 80 ? 'linear-gradient(90deg, #ef4444 0%, #ef4444 100%)' : 
+                             metric.level >= 60 ? 'linear-gradient(90deg, #f97316 0%, #f97316 100%)' :
+                             metric.level >= 40 ? 'linear-gradient(90deg, #eab308 0%, #eab308 100%)' : 'linear-gradient(90deg, #10b981 0%, #10b981 100%)',
+                  boxShadow: metric.level >= 80 ? '0 0 10px rgba(239, 68, 68, 0.5)' :
+                            metric.level >= 60 ? '0 0 10px rgba(249, 115, 22, 0.5)' : 'none'
+                }}
               />
             </div>
           </div>
         ))}
         
         {/* Mini Chart */}
-        <div className="pt-2 border-t border-[#1e2128]">
+        <div className="pt-2 border-t" style={{ borderTopColor: 'rgba(75, 85, 99, 0.2)' }}>
           <div className="h-12">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData}>
-                <Area type="monotone" dataKey="value" stroke="#ef4444" fill="#ef4444" isAnimationActive={false} />
+                <Area type="monotone" dataKey="value" stroke="#ef4444" fill="url(#colorGradient)" isAnimationActive={false} />
+                <defs>
+                  <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -585,31 +747,41 @@ function EscalationPanel({ metrics }: { metrics: EscalationMetric[] }) {
 
 function EarthquakePanel({ earthquakes }: { earthquakes: EarthquakeData[] }) {
   return (
-    <div className="flex flex-col bg-[#0f1115]">
-      <div className="p-2.5 border-b border-[#1e2128] flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs font-medium text-gray-300">
-          <Activity className="w-3.5 h-3.5" />
+    <div className="flex flex-col" style={{
+      background: 'linear-gradient(180deg, rgba(15,17,21,0.8) 0%, rgba(10,12,16,0.6) 100%)',
+      border: '1px solid rgba(75, 85, 99, 0.2)',
+      borderRadius: '8px',
+    }}>
+      <div className="p-3 border-b flex items-center justify-between" style={{ borderBottomColor: 'rgba(75, 85, 99, 0.2)' }}>
+        <div className="flex items-center gap-2 text-xs font-bold text-gray-200 tracking-wider">
+          <Activity className="w-4 h-4 text-orange-400" />
           <span>SEISMIC ACTIVITY</span>
         </div>
-        <span className="text-[10px] text-gray-500">USGS FEED</span>
+        <span className="text-[9px] font-mono text-gray-500 bg-orange-500/10 px-2 py-1 rounded">USGS</span>
       </div>
       
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         <table className="w-full text-[10px]">
           <thead>
-            <tr className="text-gray-500 border-b border-[#1e2128]">
-              <th className="text-left p-2">Location</th>
-              <th className="text-center p-2">Magnitude</th>
-              <th className="text-center p-2">Depth</th>
+            <tr className="sticky top-0 bg-black/20" style={{ borderBottomColor: 'rgba(75, 85, 99, 0.2)' }}>
+              <th className="text-left p-3 font-semibold text-gray-400 border-b" style={{ borderBottomColor: 'rgba(75, 85, 99, 0.2)' }}>Location</th>
+              <th className="text-center p-3 font-semibold text-gray-400 border-b" style={{ borderBottomColor: 'rgba(75, 85, 99, 0.2)' }}>Magnitude</th>
+              <th className="text-center p-3 font-semibold text-gray-400 border-b" style={{ borderBottomColor: 'rgba(75, 85, 99, 0.2)' }}>Depth</th>
             </tr>
           </thead>
           <tbody>
             {earthquakes.length > 0 ? (
               earthquakes.map((eq) => (
-                <tr key={eq.id} className="border-b border-[#1e2128] hover:bg-[#15181e]">
-                  <td className="p-2 text-gray-300">{eq.location}</td>
-                  <td className="text-center p-2 text-orange-400 font-medium">{eq.magnitude}</td>
-                  <td className="text-center p-2 text-gray-400">{eq.depth}km</td>
+                <tr key={eq.id} className="border-b transition-colors duration-300 hover:bg-[rgba(75,85,99,0.1)]" style={{
+                  borderBottomColor: 'rgba(75, 85, 99, 0.15)',
+                }}>
+                  <td className="p-3 text-gray-300 font-medium">{eq.location}</td>
+                  <td className="text-center p-3 font-bold" style={{
+                    color: eq.magnitude >= 7 ? '#fca5a5' : eq.magnitude >= 5.5 ? '#fed7aa' : '#fef08a'
+                  }}>
+                    {eq.magnitude}
+                  </td>
+                  <td className="text-center p-3 text-gray-400 font-mono">{eq.depth}km</td>
                 </tr>
               ))
             ) : (
@@ -633,52 +805,71 @@ function AISummaryPanel() {
   };
   
   return (
-    <div className="flex flex-col bg-[#0f1115]">
-      <div className="p-2.5 border-b border-[#1e2128] flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs font-medium text-gray-300">
-          <Zap className="w-3.5 h-3.5 text-purple-400" />
-          <span>AI SUMMARY</span>
+    <div className="flex flex-col" style={{
+      background: 'linear-gradient(180deg, rgba(15,17,21,0.8) 0%, rgba(10,12,16,0.6) 100%)',
+      border: '1px solid rgba(75, 85, 99, 0.2)',
+      borderRadius: '8px',
+    }}>
+      <div className="p-3 border-b flex items-center justify-between" style={{ borderBottomColor: 'rgba(75, 85, 99, 0.2)' }}>
+        <div className="flex items-center gap-2 text-xs font-bold text-gray-200 tracking-wider">
+          <Zap className="w-4 h-4 text-purple-400" />
+          <span>AI INTELLIGENCE BRIEF</span>
         </div>
         <button 
           onClick={handleRegenerate}
-          className="text-[10px] text-purple-400 hover:text-purple-300 flex items-center gap-1 transition-colors"
+          className="text-[9px] font-semibold text-purple-400 hover:text-purple-300 flex items-center gap-1.5 transition-colors px-2 py-1 rounded hover:bg-purple-500/10"
         >
-          <RefreshCw className={cn("w-3 h-3", isGenerating && "animate-spin")} />
-          REGENERATE
+          <RefreshCw className={cn("w-3.5 h-3.5", isGenerating && "animate-spin")} />
+          REFRESH
         </button>
       </div>
       
-      <div className="p-2.5">
-        <div className="space-y-2">
-          <div className="bg-purple-500/10 border border-purple-500/20 rounded p-2 text-[10px] text-purple-300">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="w-3 h-3 text-orange-400 mt-0.5 shrink-0" />
-              <div>
-                <p className="font-medium mb-1">Current Status Summary</p>
-                <p className="text-purple-400/80">Global escalation metrics showing increased activity in the Middle East region. Multiple conflict zones reporting elevated tensions. Recommend monitoring closely over next 48 hours.</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-2">
-            <div className="bg-[#15181e] p-2 rounded">
-              <div className="text-[9px] text-gray-500 mb-1">Predicted Trend</div>
-              <div className="flex items-center gap-1">
-                <TrendingUp className="w-3 h-3 text-red-400" />
-                <span className="text-[10px] text-red-400 font-medium">INCREASING</span>
-              </div>
-            </div>
-            <div className="bg-[#15181e] p-2 rounded">
-              <div className="text-[9px] text-gray-500 mb-1">Confidence</div>
-              <span className="text-[10px] text-blue-400 font-medium">87%</span>
+      <div className="p-3 space-y-3">
+        <div className="p-2.5 rounded-lg border" style={{
+          background: 'rgba(168, 85, 247, 0.08)',
+          borderColor: 'rgba(168, 85, 247, 0.25)',
+        }}>
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-purple-400 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="font-semibold text-xs text-purple-300 mb-1.5">Current Situation Analysis</p>
+              <p className="text-[10px] text-purple-300/80 leading-relaxed">Global escalation metrics indicate elevated activity in the Middle East region. Multiple conflict zones report increased tensions. Recommend continued monitoring over next 48 hours. GDELT correlation index: 87%.</p>
             </div>
           </div>
         </div>
+        
+        <div className="grid grid-cols-2 gap-2">
+          <div className="p-2 rounded-lg border transition-all duration-300 hover:border-blue-500/30 hover:bg-blue-500/5" style={{
+            background: 'rgba(59, 130, 246, 0.08)',
+            borderColor: 'rgba(59, 130, 246, 0.2)',
+          }}>
+            <div className="text-[9px] text-gray-500 mb-1.5 font-semibold">TREND</div>
+            <div className="flex items-center gap-1.5">
+              <TrendingUp className="w-4 h-4 text-red-400" />
+              <span className="text-[10px] text-red-400 font-bold">ESCALATING</span>
+            </div>
+          </div>
+          <div className="p-2 rounded-lg border transition-all duration-300 hover:border-blue-500/30 hover:bg-blue-500/5" style={{
+            background: 'rgba(59, 130, 246, 0.08)',
+            borderColor: 'rgba(59, 130, 246, 0.2)',
+          }}>
+            <div className="text-[9px] text-gray-500 mb-1.5 font-semibold">CONFIDENCE</div>
+            <span className="text-[10px] text-blue-400 font-bold">92%</span>
+          </div>
+        </div>
 
-        <div className="flex gap-1 mt-2">
-          <div className="h-1 flex-1 bg-red-500/20 rounded-full" />
-          <div className="h-1 flex-1 bg-red-500/20 rounded-full" />
-          <div className="h-1 flex-1 bg-red-500/10 rounded-full" />
+        <div className="flex gap-1">
+          <div className="h-1.5 flex-1 rounded-full" style={{
+            background: 'linear-gradient(90deg, #ef4444, #f97316)',
+            boxShadow: '0 0 10px rgba(239, 68, 68, 0.3)'
+          }} />
+          <div className="h-1.5 flex-1 rounded-full" style={{
+            background: 'linear-gradient(90deg, #f97316, #eab308)',
+            boxShadow: '0 0 10px rgba(249, 115, 22, 0.3)'
+          }} />
+          <div className="h-1.5 flex-1 rounded-full opacity-40" style={{
+            background: 'rgba(75, 85, 99, 0.2)',
+          }} />
         </div>
       </div>
     </div>
@@ -708,7 +899,7 @@ function App() {
             const events: ConflictEvent[] = [];
             const csvData = results.data as string[][];
             
-            csvData.slice(0, 100).forEach((row, idx) => {
+            csvData.slice(0, 1000).forEach((row, idx) => {
               if (row.length > 54 && row[53] && row[54]) {
                 try {
                   const lat = parseFloat(row[53]);
@@ -830,7 +1021,7 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen bg-[#0a0c10] text-gray-100 overflow-hidden">
-      <Header onCommand={handleCommand} />
+      <Header onCommand={handleCommand} eventCount={gdeltEvents.length} />
       <StatsPanel />
       
       <div className="flex flex-1 overflow-hidden">
@@ -851,12 +1042,16 @@ function App() {
       </div>
       
       {/* Bottom Panels */}
-      <div className="grid grid-cols-3 gap-px bg-[#1e2128] border-t border-[#1e2128] max-h-[420px]">
+      <div className="grid grid-cols-3 gap-2 p-3 border-t" style={{
+        borderTopColor: 'rgba(75, 85, 99, 0.2)',
+        maxHeight: '420px',
+        background: 'linear-gradient(180deg, rgba(10,12,16,0.5) 0%, rgba(10,12,16,0.8) 100%)',
+      }}>
         <NewsPanel news={filteredNews} />
         <VideoPanel videos={mockVideos} />
-        <div className="grid grid-rows-2 gap-px bg-[#1e2128]">
+        <div className="grid grid-rows-2 gap-2">
           <EscalationPanel metrics={mockMetrics} />
-          <div className="grid grid-cols-2 gap-px bg-[#1e2128]">
+          <div className="grid grid-cols-2 gap-2">
             <EarthquakePanel earthquakes={mockEarthquakes} />
             <AISummaryPanel />
           </div>
