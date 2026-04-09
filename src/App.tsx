@@ -1069,21 +1069,20 @@ function App() {
       </div>
       
       {/* Bottom Panels */}
-      <div className="flex gap-2 p-3 border-t max-h-[280px] justify-between" style={{
+      <div className="flex gap-2 p-3 border-t max-h-[280px]" style={{
         borderTopColor: 'rgba(75, 85, 99, 0.2)',
         background: 'linear-gradient(180deg, rgba(10,12,16,0.5) 0%, rgba(10,12,16,0.8) 100%)',
       }}>
-        {/* Left: Video and Escalation */}
-        <div className="flex flex-col gap-2 w-96">
-          <VideoPanel videos={mockVideos} />
-          <div className="grid grid-cols-2 gap-2">
+        {/* Left: Earthquake and Escalation */}
+        <div className="flex flex-col gap-2 w-72">
+          <div className="grid grid-cols-2 gap-2 h-full">
             <EarthquakePanel earthquakes={mockEarthquakes} />
             <EscalationPanel metrics={mockMetrics} />
           </div>
         </div>
         
-        {/* Center: Real-time News (Smaller) */}
-        <div className="w-96">
+        {/* Center: Real-time News (Main Panel) */}
+        <div className="flex-1">
           <RealTimeNewsPanel 
             news={filteredNews} 
             isLoading={isLoadingNews}
@@ -1092,8 +1091,10 @@ function App() {
           />
         </div>
         
-        {/* Right: Placeholder for future content */}
-        <div className="w-96" />
+        {/* Right: Video Feeds */}
+        <div className="w-96">
+          <VideoPanel videos={mockVideos} />
+        </div>
       </div>
     </div>
   );
