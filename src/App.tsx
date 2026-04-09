@@ -6,8 +6,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { Globe, Newspaper, Video, Activity, AlertTriangle, Command, TrendingUp, TrendingDown, Clock, Zap, Shield, Satellite, ChevronRight, Filter, RefreshCw, Database, Cpu, Eye, Target, ExternalLink } from 'lucide-react';
-import countries from './lib/countries.json';
+import { Globe, Video, Activity, AlertTriangle, Command, TrendingUp, TrendingDown, Clock, Zap, Shield, Satellite, ChevronRight, Filter, RefreshCw, Database, Cpu, Eye, Target } from 'lucide-react';
 
 // Utility
 function cn(...inputs: ClassValue[]) {
@@ -25,16 +24,6 @@ interface ConflictEvent {
   timestamp: Date;
   description: string;
   countryCode?: string;
-}
-
-interface NewsItem {
-  id: string;
-  title: string;
-  source: string;
-  timestamp: Date;
-  category: string;
-  severity: 'critical' | 'high' | 'medium' | 'low';
-  url: string;
 }
 
 interface VideoFeed {
@@ -64,13 +53,6 @@ interface EscalationMetric {
 
 // API Configuration
 const GDELT_CSV_URL = import.meta.env.VITE_GDELT_CSV_URL || 'http://data.gdeltproject.org/events/last15minutes.csv';
-const NEWSAPI_KEY = import.meta.env.VITE_NEWSAPI_KEY;
-
-// Helper function to parse country from prompt
-function parseCountryFromPrompt(prompt: string) {
-  const countryName = prompt.replace('/newsnow', '').trim();
-  return countries.find((c: any) => c.name.toLowerCase().includes(countryName.toLowerCase()));
-}
 
 // Helper function to determine event severity based on Goldstein scale
 function getSeverityFromGoldstein(scale: number): 'critical' | 'high' | 'medium' | 'low' {
@@ -546,69 +528,7 @@ function WorldMap({
   );
 }
 
-function NewsPanel({ news }: { news: NewsItem[] }) {
-  return (
-    <div className="flex flex-col h-[280px]" style={{
-      background: 'linear-gradient(180deg, rgba(15,17,21,0.8) 0%, rgba(10,12,16,0.6) 100%)',
-      border: '1px solid rgba(75, 85, 99, 0.2)',
-      borderRadius: '8px',
-    }}>
-      <div className="p-3 border-b flex items-center justify-between" style={{ borderBottomColor: 'rgba(75, 85, 99, 0.2)' }}>
-        <div className="flex items-center gap-2 text-xs font-bold text-gray-200 tracking-wider">
-          <Newspaper className="w-4 h-4 text-amber-400" />
-          <span>LIVE NEWS FEED</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full status-error" />
-          <span className="text-[9px] text-gray-500 font-mono">LIVE</span>
-        </div>
-      </div>
-      
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
-        {news.length > 0 ? (
-          news.map((item) => (
-            <a 
-              key={item.id} 
-              href={item.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block px-3 py-2.5 transition-all duration-300 group hover:bg-[rgba(75,85,99,0.1)]"
-              style={{
-                borderBottom: '1px solid rgba(75, 85, 99, 0.15)',
-              }}
-            >
-              <div className="flex items-start gap-2.5">
-                <div className="flex-shrink-0 mt-0.5">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold" style={{
-                    background: item.severity === 'critical' ? 'rgba(239, 68, 68, 0.2)' : 
-                               item.severity === 'high' ? 'rgba(249, 115, 22, 0.2)' :
-                               item.severity === 'medium' ? 'rgba(234, 179, 8, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-                    color: item.severity === 'critical' ? '#fca5a5' : 
-                           item.severity === 'high' ? '#fed7aa' :
-                           item.severity === 'medium' ? '#fef08a' : '#a7f3d0',
-                  }}>
-                    {item.category}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-xs text-gray-100 leading-snug mb-1.5 line-clamp-2 group-hover:text-white transition-colors font-semibold">{item.title}</h4>
-                  <div className="flex items-center gap-1.5 text-[9px] text-gray-500">
-                    <span className="font-medium text-gray-400">{item.source}</span>
-                    <span className="opacity-50">•</span>
-                    <span className="font-mono">{format(item.timestamp, 'HH:mm')}</span>
-                    <ExternalLink className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-gray-400" />
-                  </div>
-                </div>
-              </div>
-            </a>
-          ))
-        ) : (
-          <div className="p-4 text-center text-gray-500 text-xs">No news available</div>
-        )}
-      </div>
-    </div>
-  );
-}
+
 
 function VideoPanel({ videos }: { videos: VideoFeed[] }) {
   return (
@@ -881,9 +801,7 @@ function App() {
   const [selectedFilters, setSelectedFilters] = useState<string[]>(['conflict']);
   const [showSatellite, setShowSatellite] = useState(false);
   const [gdeltEvents, setGdeltEvents] = useState<ConflictEvent[]>([]);
-  const [filteredNews, setFilteredNews] = useState<NewsItem[]>([]);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([25, 20]);
-  const [selectedCountry, setSelectedCountry] = useState<any>(null);
+  const mapCenter: [number, number] = [25, 20];
 
   // Fetch GDELT CSV and parse (auto-refresh every 30 seconds)
   useEffect(() => {
@@ -941,51 +859,11 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch NewsAPI (auto-refresh every 60 seconds)
-  useEffect(() => {
-    const fetchNews = async () => {
-      if (!NEWSAPI_KEY) {
-        console.warn('VITE_NEWSAPI_KEY not set');
-        return;
-      }
-      
-      try {
-        const country = selectedCountry?.name || 'world';
-        const response = await fetch(
-          `https://newsapi.org/v2/everything?q=${country}&sortBy=publishedAt&language=en&pageSize=10&apiKey=${NEWSAPI_KEY}`
-        );
-        const data = await response.json();
-        
-        const news: NewsItem[] = (data.articles || []).slice(0, 10).map((article: any, idx: number) => ({
-          id: `news-${idx}`,
-          title: article.title,
-          source: article.source.name,
-          timestamp: new Date(article.publishedAt),
-          category: 'News',
-          severity: 'medium' as const,
-          url: article.url,
-        }));
-        
-        setFilteredNews(news);
-      } catch (error) {
-        console.error('Failed to fetch news:', error);
-      }
-    };
-    
-    fetchNews();
-    const interval = setInterval(fetchNews, 60000);
-    return () => clearInterval(interval);
-  }, [selectedCountry]);
 
   // Handle command submission
   const handleCommand = (cmd: string) => {
-    if (cmd.startsWith('/newsnow')) {
-      const country = parseCountryFromPrompt(cmd);
-      if (country) {
-        setSelectedCountry(country);
-        setMapCenter([country.lat, country.lng]);
-      }
-    }
+    // Command handler for future extensions
+    console.log('Command:', cmd);
   };
 
   const mockEarthquakes: EarthquakeData[] = [
@@ -1042,19 +920,20 @@ function App() {
       </div>
       
       {/* Bottom Panels */}
-      <div className="grid grid-cols-3 gap-2 p-3 border-t" style={{
+      <div className="flex gap-2 p-3 border-t h-[280px]" style={{
         borderTopColor: 'rgba(75, 85, 99, 0.2)',
-        maxHeight: '420px',
         background: 'linear-gradient(180deg, rgba(10,12,16,0.5) 0%, rgba(10,12,16,0.8) 100%)',
       }}>
-        <NewsPanel news={filteredNews} />
-        <VideoPanel videos={mockVideos} />
-        <div className="grid grid-rows-2 gap-2">
+        {/* Left: Earth and AI Summary */}
+        <div className="flex-1 grid grid-cols-2 gap-2">
+          <EarthquakePanel earthquakes={mockEarthquakes} />
+          <AISummaryPanel />
+        </div>
+        
+        {/* Right: Video and Escalation */}
+        <div className="flex flex-col gap-2 w-96">
+          <VideoPanel videos={mockVideos} />
           <EscalationPanel metrics={mockMetrics} />
-          <div className="grid grid-cols-2 gap-2">
-            <EarthquakePanel earthquakes={mockEarthquakes} />
-            <AISummaryPanel />
-          </div>
         </div>
       </div>
     </div>
