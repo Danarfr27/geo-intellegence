@@ -391,12 +391,12 @@ function WorldMap({
 }) {
   // Define regions for each filter type (lat/lng bounds)
   const filterRegions: Record<string, { minLat: number; maxLat: number; minLng: number; maxLng: number }> = {
-    war: { minLat: 25, maxLat: 40, minLng: 35, maxLng: 55 }, // Middle East
-    conflict: { minLat: -35, maxLat: 55, minLng: -20, maxLng: 160 }, // Global areas
-    virus: { minLat: -60, maxLat: 80, minLng: -180, maxLng: 180 }, // Worldwide
-    earthquake: { minLat: -60, maxLat: 80, minLng: -180, maxLng: 180 }, // Global
-    cyber: { minLat: -60, maxLat: 80, minLng: -180, maxLng: 180 }, // Global
-    political: { minLat: -60, maxLat: 80, minLng: -180, maxLng: 180 }, // Global
+    war: { minLat: 25, maxLat: 55, minLng: 10, maxLng: 70 }, // Middle East + Eastern Europe (Iran, Israel, Russia-Ukraine, Syria, Iraq)
+    conflict: { minLat: -60, maxLat: 80, minLng: -180, maxLng: 180 }, // Global conflict zones
+    virus: { minLat: -60, maxLat: 80, minLng: -180, maxLng: 180 }, // Worldwide epidemiology
+    earthquake: { minLat: -60, maxLat: 80, minLng: -180, maxLng: 180 }, // Global seismic activity
+    cyber: { minLat: -60, maxLat: 80, minLng: -180, maxLng: 180 }, // Global cyber threats
+    political: { minLat: -60, maxLat: 80, minLng: -180, maxLng: 180 }, // Global political events
   };
 
   const isInRegion = (lat: number, lng: number, region: { minLat: number; maxLat: number; minLng: number; maxLng: number }) => {
@@ -599,7 +599,7 @@ function RealTimeNewsPanel({
   selectedCountry: any;
 }) {
   return (
-    <div className="flex flex-col bg-gradient-to-b from-[rgba(15,17,21,0.95)] to-[rgba(10,12,16,0.85)] border border-[rgba(75,85,99,0.2)] rounded-lg shadow-lg h-full max-h-[600px]" style={{
+    <div className="flex flex-col bg-gradient-to-b from-[rgba(15,17,21,0.95)] to-[rgba(10,12,16,0.85)] border border-[rgba(75,85,99,0.2)] rounded-lg shadow-lg h-full max-h-[250px]" style={{
       background: 'linear-gradient(135deg, rgba(15,17,21,0.95) 0%, rgba(10,12,16,0.85) 100%)',
       border: '1px solid rgba(75,85,99,0.2)',
       backdropFilter: 'blur(10px)',
