@@ -20,7 +20,7 @@ interface ConflictEvent {
   lat: number;
   lng: number;
   title: string;
-  type: 'conflict' | 'earthquake' | 'cyber' | 'political';
+  type: 'conflict' | 'earthquake' | 'cyber' | 'political' | 'war' | 'virus';
   severity: 'critical' | 'high' | 'medium' | 'low';
   timestamp: Date;
   description: string;
@@ -82,14 +82,18 @@ function getSeverityFromGoldstein(scale: number): 'critical' | 'high' | 'medium'
 }
 
 // Helper function to get event type
-function getEventType(eventCode: string): 'conflict' | 'earthquake' | 'cyber' | 'political' {
+function getEventType(eventCode: string): 'conflict' | 'earthquake' | 'cyber' | 'political' | 'war' | 'virus' {
   const code = parseInt(eventCode);
-  // Conflict events: 190-195 (WEIS categories)
-  if (code >= 190 && code <= 195) return 'conflict';
-  if (code >= 170 && code <= 189) return 'conflict';
-  // Political events: 010-013, 020-024, etc
-  if ((code >= 10 && code <= 15) || (code >= 20 && code <= 24) || (code >= 30 && code <= 34)) return 'political';
-  // Use goldstein scale as fallback: high negative = conflict
+  // War events: 180-195 (armed conflict)
+  if (code >= 180 && code <= 195) return 'war';
+  // Conflict events: 160-179 (protest, violence)
+  if (code >= 160 && code <= 179) return 'conflict';
+  // Cyber events: high frequency, specific patterns
+  if (code >= 140 && code <= 159) return 'cyber';
+  // Virus/Pandemic: health-related
+  if (code >= 100 && code <= 130) return 'virus';
+  // Political events: 010-099
+  if (code >= 10 && code <= 99) return 'political';
   return 'conflict';
 }
 
@@ -107,6 +111,8 @@ const createCustomIcon = (severity: string, type: string) => {
     earthquake: '🌋',
     cyber: '💻',
     political: '🏛️',
+    war: '💥',
+    virus: '🦠',
   };
   
   return L.divIcon({
@@ -250,6 +256,7 @@ function Sidebar({ selectedFilters, onFilterChange }: {
     { id: 'virus', label: 'Virus/Pandemic', icon: AlertTriangle, color: 'orange', badge: 'VIRUS' },
     { id: 'earthquake', label: 'Earthquakes', icon: AlertCircle, color: 'orange', badge: 'GEMPA' },
     { id: 'cyber', label: 'Cyber War', icon: Cpu, color: 'purple', badge: 'CYBER' },
+    { id: 'political', label: 'Political', icon: Target, color: 'blue', badge: 'POLITICS' },
   ];
   
   const dataSources = [
@@ -844,7 +851,7 @@ function EarthquakePanel({ earthquakes }: { earthquakes: EarthquakeData[] }) {
 
 // Main App
 function App() {
-  const [selectedFilters, setSelectedFilters] = useState<string[]>(['conflict']);
+  const [selectedFilters, setSelectedFilters] = useState<string[]>(['conflict', 'war', 'virus', 'earthquake', 'cyber', 'political']);
   const [showSatellite, setShowSatellite] = useState(false);
   const [gdeltEvents, setGdeltEvents] = useState<ConflictEvent[]>([]);
   const [filteredNews, setFilteredNews] = useState<NewsItem[]>([]);
