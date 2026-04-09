@@ -389,8 +389,28 @@ function WorldMap({
   toggleSatellite: () => void;
   mapCenter: [number, number];
 }) {
+  // Define regions for each filter type (lat/lng bounds)
+  const filterRegions: Record<string, { minLat: number; maxLat: number; minLng: number; maxLng: number }> = {
+    war: { minLat: 25, maxLat: 40, minLng: 35, maxLng: 55 }, // Middle East
+    conflict: { minLat: -35, maxLat: 55, minLng: -20, maxLng: 160 }, // Global areas
+    virus: { minLat: -60, maxLat: 80, minLng: -180, maxLng: 180 }, // Worldwide
+    earthquake: { minLat: -60, maxLat: 80, minLng: -180, maxLng: 180 }, // Global
+    cyber: { minLat: -60, maxLat: 80, minLng: -180, maxLng: 180 }, // Global
+    political: { minLat: -60, maxLat: 80, minLng: -180, maxLng: 180 }, // Global
+  };
+
+  const isInRegion = (lat: number, lng: number, region: { minLat: number; maxLat: number; minLng: number; maxLng: number }) => {
+    return lat >= region.minLat && lat <= region.maxLat && lng >= region.minLng && lng <= region.maxLng;
+  };
+
   const filteredEvents = selectedFilters.length > 0 
-    ? events.filter(e => selectedFilters.includes(e.type))
+    ? events.filter(e => {
+        const hasType = selectedFilters.includes(e.type);
+        if (!hasType) return false;
+        const region = filterRegions[e.type];
+        if (!region) return true;
+        return isInRegion(e.lat, e.lng, region);
+      })
     : events;
     
   return (
@@ -1049,12 +1069,21 @@ function App() {
       </div>
       
       {/* Bottom Panels */}
-      <div className="flex gap-2 p-3 border-t max-h-[280px]" style={{
+      <div className="flex gap-2 p-3 border-t max-h-[280px] justify-between" style={{
         borderTopColor: 'rgba(75, 85, 99, 0.2)',
         background: 'linear-gradient(180deg, rgba(10,12,16,0.5) 0%, rgba(10,12,16,0.8) 100%)',
       }}>
-        {/* Left: Real-time News */}
-        <div className="flex-1">
+        {/* Left: Video and Escalation */}
+        <div className="flex flex-col gap-2 w-96">
+          <VideoPanel videos={mockVideos} />
+          <div className="grid grid-cols-2 gap-2">
+            <EarthquakePanel earthquakes={mockEarthquakes} />
+            <EscalationPanel metrics={mockMetrics} />
+          </div>
+        </div>
+        
+        {/* Center: Real-time News (Smaller) */}
+        <div className="w-96">
           <RealTimeNewsPanel 
             news={filteredNews} 
             isLoading={isLoadingNews}
@@ -1063,14 +1092,8 @@ function App() {
           />
         </div>
         
-        {/* Right: Earth, Video and Escalation */}
-        <div className="flex flex-col gap-2 w-96">
-          <VideoPanel videos={mockVideos} />
-          <div className="grid grid-cols-2 gap-2">
-            <EarthquakePanel earthquakes={mockEarthquakes} />
-            <EscalationPanel metrics={mockMetrics} />
-          </div>
-        </div>
+        {/* Right: Placeholder for future content */}
+        <div className="w-96" />
       </div>
     </div>
   );
