@@ -20,7 +20,7 @@ interface ConflictEvent {
   lat: number;
   lng: number;
   title: string;
-  type: 'conflict' | 'earthquake' | 'cyber' | 'political' | 'war' | 'virus';
+  type: 'conflict' | 'earthquake' | 'cyber' | 'political' | 'war' | 'virus' | 'worldwar';
   severity: 'critical' | 'high' | 'medium' | 'low';
   timestamp: Date;
   description: string;
@@ -82,8 +82,10 @@ function getSeverityFromGoldstein(scale: number): 'critical' | 'high' | 'medium'
 }
 
 // Helper function to get event type
-function getEventType(eventCode: string): 'conflict' | 'earthquake' | 'cyber' | 'political' | 'war' | 'virus' {
+function getEventType(eventCode: string): 'conflict' | 'earthquake' | 'cyber' | 'political' | 'war' | 'virus' | 'worldwar' {
   const code = parseInt(eventCode);
+  // World War events: 196-210 (international armed conflict)
+  if (code >= 196 && code <= 210) return 'worldwar';
   // War events: 180-195 (armed conflict)
   if (code >= 180 && code <= 195) return 'war';
   // Conflict events: 160-179 (protest, violence)
@@ -112,6 +114,7 @@ const createCustomIcon = (severity: string, type: string) => {
     cyber: '💻',
     political: '🏛️',
     war: '💥',
+    worldwar: '🌍',
     virus: '🦠',
   };
   
@@ -160,6 +163,7 @@ function Header({ onCommand, eventCount, onToggleSidebar, sidebarOpen, selectedF
 
   const additionalFilters = [
     { id: 'cyber', label: 'Cyber War', icon: Cpu, color: '#a855f7' },
+    { id: 'worldwar', label: 'World War', icon: Flame, color: '#10b981' },
     { id: 'political', label: 'Political', icon: Target, color: '#3b82f6' },
     { id: 'earthquake', label: 'Earthquakes', icon: AlertCircle, color: '#f97316' },
   ];
@@ -443,6 +447,7 @@ function WorldMap({
   // Define regions for each filter type (lat/lng bounds)
   const filterRegions: Record<string, { minLat: number; maxLat: number; minLng: number; maxLng: number }> = {
     war: { minLat: 25, maxLat: 55, minLng: 10, maxLng: 70 }, // Middle East + Eastern Europe (Iran, Israel, Russia-Ukraine, Syria, Iraq)
+    worldwar: { minLat: -60, maxLat: 80, minLng: -180, maxLng: 180 }, // Global major conflicts
     conflict: { minLat: -60, maxLat: 80, minLng: -180, maxLng: 180 }, // Global conflict zones
     virus: { minLat: -60, maxLat: 80, minLng: -180, maxLng: 180 }, // Worldwide epidemiology
     earthquake: { minLat: -60, maxLat: 80, minLng: -180, maxLng: 180 }, // Global seismic activity
@@ -901,7 +906,7 @@ function EarthquakePanel({ earthquakes }: { earthquakes: EarthquakeData[] }) {
 
 // Main App
 function App() {
-  const [selectedFilters, setSelectedFilters] = useState<string[]>(['conflict', 'war', 'virus', 'earthquake', 'cyber', 'political']);
+  const [selectedFilters, setSelectedFilters] = useState<string[]>(['conflict', 'war', 'worldwar', 'virus', 'earthquake', 'cyber', 'political']);
   const [showSatellite, setShowSatellite] = useState(false);
   const [gdeltEvents, setGdeltEvents] = useState<ConflictEvent[]>([]);
   const [filteredNews, setFilteredNews] = useState<NewsItem[]>([]);
