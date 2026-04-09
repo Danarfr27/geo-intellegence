@@ -140,9 +140,10 @@ const createCustomIcon = (severity: string, type: string) => {
 };
 
 // Components
-function Header({ onCommand, eventCount, onToggleSidebar, sidebarOpen }: { onCommand: (cmd: string) => void; eventCount: number; onToggleSidebar?: () => void; sidebarOpen?: boolean }) {
+function Header({ onCommand, eventCount, onToggleSidebar, sidebarOpen, selectedFilters, onFilterChange }: { onCommand: (cmd: string) => void; eventCount: number; onToggleSidebar?: () => void; sidebarOpen?: boolean; selectedFilters?: string[]; onFilterChange?: (filter: string) => void }) {
   const [command, setCommand] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false);
   
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -156,6 +157,12 @@ function Header({ onCommand, eventCount, onToggleSidebar, sidebarOpen }: { onCom
       setCommand('');
     }
   };
+
+  const additionalFilters = [
+    { id: 'cyber', label: 'Cyber War', icon: Cpu, color: '#a855f7' },
+    { id: 'political', label: 'Political', icon: Target, color: '#3b82f6' },
+    { id: 'earthquake', label: 'Earthquakes', icon: AlertCircle, color: '#f97316' },
+  ];
   
   return (
     <header className="h-12 bg-gradient-to-r from-[#0a0c10] via-[#0f1115] to-[#0a0c10] border-b border-[#2a2f3a] flex items-center px-4 shrink-0 shadow-lg shadow-red-500/5">
@@ -168,6 +175,53 @@ function Header({ onCommand, eventCount, onToggleSidebar, sidebarOpen }: { onCom
         >
           {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
+
+        {/* Filter Menu Button (3 lines) */}
+        <div className="relative">
+          <button
+            onClick={() => setFilterMenuOpen(!filterMenuOpen)}
+            className="flex items-center justify-center w-8 h-8 text-gray-400 hover:text-blue-400 transition-colors group"
+            title="Additional filters"
+          >
+            <div className="flex flex-col gap-1">
+              <div className="w-4 h-0.5 bg-current transition-all" style={{width: filterMenuOpen ? '16px' : '16px'}} />
+              <div className="w-4 h-0.5 bg-current transition-all" style={{width: filterMenuOpen ? '16px' : '16px'}} />
+              <div className="w-4 h-0.5 bg-current transition-all" style={{width: filterMenuOpen ? '16px' : '16px'}} />
+            </div>
+          </button>
+
+          {/* Filter Dropdown Menu */}
+          {filterMenuOpen && (
+            <div className="absolute top-full left-0 mt-2 w-48 bg-[#0f1115] border border-[#2a2f3a] rounded-lg shadow-lg z-50 overflow-hidden" style={{
+              background: 'linear-gradient(135deg, rgba(15,17,21,0.95) 0%, rgba(10,12,16,0.95) 100%)',
+              backdropFilter: 'blur(10px)',
+            }}>
+              {additionalFilters.map((filter) => {
+                const Icon = filter.icon;
+                const isSelected = selectedFilters?.includes(filter.id);
+                return (
+                  <button
+                    key={filter.id}
+                    onClick={() => {
+                      onFilterChange?.(filter.id);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-xs font-semibold text-left hover:bg-[rgba(75,85,99,0.2)] transition-all duration-200 border-b border-[rgba(75,85,99,0.1)] last:border-b-0 group"
+                    style={{
+                      color: isSelected ? filter.color : '#9ca3af',
+                      background: isSelected ? `${filter.color}15` : 'transparent',
+                    }}
+                  >
+                    <Icon className="w-4 h-4 flex-shrink-0" style={{color: filter.color}} />
+                    <div className="flex-1">{filter.label}</div>
+                    {isSelected && (
+                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{background: filter.color}} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
         
         <div className="relative">
           <Globe className="w-5 h-5 text-red-500 animate-spin" style={{animationDuration: '6s'}} />
@@ -263,9 +317,6 @@ function Sidebar({ selectedFilters, onFilterChange }: {
     { id: 'conflict', label: 'Conflict Zones', icon: Target, color: 'red', badge: 'CONFLICT' },
     { id: 'war', label: 'War', icon: Flame, color: 'red', badge: 'WAR' },
     { id: 'virus', label: 'Virus/Pandemic', icon: AlertTriangle, color: 'orange', badge: 'VIRUS' },
-    { id: 'earthquake', label: 'Earthquakes', icon: AlertCircle, color: 'orange', badge: 'GEMPA' },
-    { id: 'cyber', label: 'Cyber War', icon: Cpu, color: 'purple', badge: 'CYBER' },
-    { id: 'political', label: 'Political', icon: Target, color: 'blue', badge: 'POLITICS' },
   ];
   
   const dataSources = [
@@ -1039,7 +1090,7 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen bg-[#0a0c10] text-gray-100 overflow-hidden">
-      <Header onCommand={handleCommand} eventCount={gdeltEvents.length} onToggleSidebar={handleToggleSidebar} sidebarOpen={sidebarOpen} />
+      <Header onCommand={handleCommand} eventCount={gdeltEvents.length} onToggleSidebar={handleToggleSidebar} sidebarOpen={sidebarOpen} selectedFilters={selectedFilters} onFilterChange={handleFilterChange} />
       <StatsPanel />
       
       <div className="flex flex-1 overflow-hidden">
