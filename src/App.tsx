@@ -6,7 +6,8 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { Globe, Video, Activity, AlertTriangle, Command, TrendingUp, TrendingDown, Clock, Zap, Shield, Satellite, ChevronRight, Filter, RefreshCw, Database, Cpu, Eye, Target } from 'lucide-react';
+import { Globe, Video, Activity, AlertTriangle, Command, TrendingUp, TrendingDown, Clock, Zap, Satellite, ChevronRight, Filter, RefreshCw, Database, Cpu, Eye, Target, Newspaper, ExternalLink, Flame, AlertCircle } from 'lucide-react';
+import countries from './lib/countries.json';
 
 // Utility
 function cn(...inputs: ClassValue[]) {
@@ -24,6 +25,17 @@ interface ConflictEvent {
   timestamp: Date;
   description: string;
   countryCode?: string;
+}
+
+interface NewsItem {
+  id: string;
+  title: string;
+  source: string;
+  timestamp: Date;
+  category: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  url: string;
+  imageUrl?: string;
 }
 
 interface VideoFeed {
@@ -53,6 +65,13 @@ interface EscalationMetric {
 
 // API Configuration
 const GDELT_CSV_URL = import.meta.env.VITE_GDELT_CSV_URL || 'http://data.gdeltproject.org/events/last15minutes.csv';
+const NEWSAPI_KEY = import.meta.env.VITE_NEWSAPI_KEY;
+
+// Helper function to parse country from prompt
+function parseCountryFromPrompt(prompt: string) {
+  const countryName = prompt.replace('/newsnow', '').trim();
+  return countries.find((c: any) => c.name.toLowerCase().includes(countryName.toLowerCase()));
+}
 
 // Helper function to determine event severity based on Goldstein scale
 function getSeverityFromGoldstein(scale: number): 'critical' | 'high' | 'medium' | 'low' {
@@ -227,9 +246,10 @@ function Sidebar({ selectedFilters, onFilterChange }: {
 }) {
   const filters = [
     { id: 'conflict', label: 'Conflict Zones', icon: Target, color: 'red', badge: 'CONFLICT' },
-    { id: 'earthquake', label: 'Earthquakes', icon: Activity, color: 'orange', badge: 'GEMPA' },
-    { id: 'cyber', label: 'Cyber Attacks', icon: Cpu, color: 'purple', badge: 'CYBER' },
-    { id: 'political', label: 'Political', icon: Shield, color: 'blue', badge: 'POLITIK' },
+    { id: 'war', label: 'War', icon: Flame, color: 'red', badge: 'WAR' },
+    { id: 'virus', label: 'Virus/Pandemic', icon: AlertTriangle, color: 'orange', badge: 'VIRUS' },
+    { id: 'earthquake', label: 'Earthquakes', icon: AlertCircle, color: 'orange', badge: 'GEMPA' },
+    { id: 'cyber', label: 'Cyber War', icon: Cpu, color: 'purple', badge: 'CYBER' },
   ];
   
   const dataSources = [
@@ -530,6 +550,112 @@ function WorldMap({
 
 
 
+
+function RealTimeNewsPanel({ 
+  news, 
+  isLoading, 
+  onRefresh, 
+  selectedCountry 
+}: { 
+  news: NewsItem[]; 
+  isLoading: boolean;
+  onRefresh: () => void;
+  selectedCountry: any;
+}) {
+  return (
+    <div className="flex flex-col bg-gradient-to-b from-[rgba(15,17,21,0.95)] to-[rgba(10,12,16,0.85)] border border-[rgba(75,85,99,0.2)] rounded-lg shadow-lg h-full max-h-[600px]" style={{
+      background: 'linear-gradient(135deg, rgba(15,17,21,0.95) 0%, rgba(10,12,16,0.85) 100%)',
+      border: '1px solid rgba(75,85,99,0.2)',
+      backdropFilter: 'blur(10px)',
+    }}>
+      {/* Header */}
+      <div className="p-3 border-b flex items-center justify-between flex-shrink-0" style={{ borderBottomColor: 'rgba(75,85,99,0.2)' }}>
+        <div className="flex items-center gap-2 flex-1">
+          <Newspaper className="w-4 h-4 text-blue-400" />
+          <div className="flex-1">
+            <div className="text-xs font-bold text-gray-200 tracking-wider">LIVE NEWS</div>
+            {selectedCountry && (
+              <div className="text-[10px] text-gray-400 font-semibold">{selectedCountry.name}</div>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={onRefresh}
+          disabled={isLoading}
+          className="p-1.5 rounded hover:bg-blue-500/10 transition-colors flex-shrink-0"
+          title="Refresh news"
+        >
+          <RefreshCw className={`w-4 h-4 text-blue-400 ${isLoading ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      {/* News List */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        {news.length > 0 ? (
+          <div>
+            {news.map((item, idx) => (
+              <a
+                key={item.id}
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block p-3 hover:bg-[rgba(75,85,99,0.1)] transition-all duration-300 group"
+                style={{
+                  borderBottom: idx < news.length - 1 ? '1px solid rgba(75,85,99,0.15)' : 'none'
+                }}
+              >
+                {/* Image */}
+                {item.imageUrl && (
+                  <div className="mb-2 rounded overflow-hidden max-h-20">
+                    <img 
+                      src={item.imageUrl} 
+                      alt={item.title}
+                      className="w-full h-20 object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+                
+                {/* Title */}
+                <h4 className="text-xs font-bold text-gray-100 mb-1.5 line-clamp-2 group-hover:text-white transition-colors leading-snug">
+                  {item.title}
+                </h4>
+                
+                {/* Meta */}
+                <div className="flex items-center justify-between text-[10px]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-semibold text-gray-400 hover:text-blue-400 transition-colors">
+                      {item.source}
+                    </span>
+                    <span className="text-gray-600">•</span>
+                    <span className="text-gray-500">{format(item.timestamp, 'HH:mm')}</span>
+                  </div>
+                  <ExternalLink className="w-3 h-3 text-gray-600 group-hover:text-blue-400 transition-colors flex-shrink-0" />
+                </div>
+              </a>
+            ))}
+          </div>
+        ) : isLoading ? (
+          <div className="flex items-center justify-center h-full text-gray-500">
+            <div className="text-center">
+              <div className="animate-spin mb-2">
+                <RefreshCw className="w-5 h-5 mx-auto" />
+              </div>
+              <div className="text-xs">Memuat berita...</div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-full text-gray-500 text-xs">
+            Tidak ada berita terbaru
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function VideoPanel({ videos }: { videos: VideoFeed[] }) {
   return (
     <div className="flex flex-col" style={{
@@ -716,92 +842,15 @@ function EarthquakePanel({ earthquakes }: { earthquakes: EarthquakeData[] }) {
   );
 }
 
-function AISummaryPanel() {
-  const [isGenerating, setIsGenerating] = useState(false);
-  
-  const handleRegenerate = () => {
-    setIsGenerating(true);
-    setTimeout(() => setIsGenerating(false), 2000);
-  };
-  
-  return (
-    <div className="flex flex-col" style={{
-      background: 'linear-gradient(180deg, rgba(15,17,21,0.8) 0%, rgba(10,12,16,0.6) 100%)',
-      border: '1px solid rgba(75, 85, 99, 0.2)',
-      borderRadius: '8px',
-    }}>
-      <div className="p-3 border-b flex items-center justify-between" style={{ borderBottomColor: 'rgba(75, 85, 99, 0.2)' }}>
-        <div className="flex items-center gap-2 text-xs font-bold text-gray-200 tracking-wider">
-          <Zap className="w-4 h-4 text-purple-400" />
-          <span>AI INTELLIGENCE BRIEF</span>
-        </div>
-        <button 
-          onClick={handleRegenerate}
-          className="text-[9px] font-semibold text-purple-400 hover:text-purple-300 flex items-center gap-1.5 transition-colors px-2 py-1 rounded hover:bg-purple-500/10"
-        >
-          <RefreshCw className={cn("w-3.5 h-3.5", isGenerating && "animate-spin")} />
-          REFRESH
-        </button>
-      </div>
-      
-      <div className="p-3 space-y-3">
-        <div className="p-2.5 rounded-lg border" style={{
-          background: 'rgba(168, 85, 247, 0.08)',
-          borderColor: 'rgba(168, 85, 247, 0.25)',
-        }}>
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-purple-400 mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="font-semibold text-xs text-purple-300 mb-1.5">Current Situation Analysis</p>
-              <p className="text-[10px] text-purple-300/80 leading-relaxed">Global escalation metrics indicate elevated activity in the Middle East region. Multiple conflict zones report increased tensions. Recommend continued monitoring over next 48 hours. GDELT correlation index: 87%.</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-2">
-          <div className="p-2 rounded-lg border transition-all duration-300 hover:border-blue-500/30 hover:bg-blue-500/5" style={{
-            background: 'rgba(59, 130, 246, 0.08)',
-            borderColor: 'rgba(59, 130, 246, 0.2)',
-          }}>
-            <div className="text-[9px] text-gray-500 mb-1.5 font-semibold">TREND</div>
-            <div className="flex items-center gap-1.5">
-              <TrendingUp className="w-4 h-4 text-red-400" />
-              <span className="text-[10px] text-red-400 font-bold">ESCALATING</span>
-            </div>
-          </div>
-          <div className="p-2 rounded-lg border transition-all duration-300 hover:border-blue-500/30 hover:bg-blue-500/5" style={{
-            background: 'rgba(59, 130, 246, 0.08)',
-            borderColor: 'rgba(59, 130, 246, 0.2)',
-          }}>
-            <div className="text-[9px] text-gray-500 mb-1.5 font-semibold">CONFIDENCE</div>
-            <span className="text-[10px] text-blue-400 font-bold">92%</span>
-          </div>
-        </div>
-
-        <div className="flex gap-1">
-          <div className="h-1.5 flex-1 rounded-full" style={{
-            background: 'linear-gradient(90deg, #ef4444, #f97316)',
-            boxShadow: '0 0 10px rgba(239, 68, 68, 0.3)'
-          }} />
-          <div className="h-1.5 flex-1 rounded-full" style={{
-            background: 'linear-gradient(90deg, #f97316, #eab308)',
-            boxShadow: '0 0 10px rgba(249, 115, 22, 0.3)'
-          }} />
-          <div className="h-1.5 flex-1 rounded-full opacity-40" style={{
-            background: 'rgba(75, 85, 99, 0.2)',
-          }} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // Main App
 function App() {
   const [selectedFilters, setSelectedFilters] = useState<string[]>(['conflict']);
   const [showSatellite, setShowSatellite] = useState(false);
   const [gdeltEvents, setGdeltEvents] = useState<ConflictEvent[]>([]);
-  const mapCenter: [number, number] = [25, 20];
+  const [filteredNews, setFilteredNews] = useState<NewsItem[]>([]);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([25, 20]);
+  const [selectedCountry, setSelectedCountry] = useState<any>(null);
+  const [isLoadingNews, setIsLoadingNews] = useState(false);
 
   // Fetch GDELT CSV and parse (auto-refresh every 30 seconds)
   useEffect(() => {
@@ -859,11 +908,56 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Fetch and refresh news function
+  const fetchNews = async () => {
+    if (!NEWSAPI_KEY) {
+      console.warn('VITE_NEWSAPI_KEY not set');
+      return;
+    }
+    
+    setIsLoadingNews(true);
+    try {
+      const country = selectedCountry?.name || 'world';
+      const response = await fetch(
+        `https://newsapi.org/v2/everything?q=${country}&sortBy=publishedAt&language=en&pageSize=30&apiKey=${NEWSAPI_KEY}`
+      );
+      const data = await response.json();
+      
+      const news: NewsItem[] = (data.articles || []).map((article: any, idx: number) => ({
+        id: `news-${idx}`,
+        title: article.title,
+        source: article.source.name,
+        timestamp: new Date(article.publishedAt),
+        category: article.category || 'News',
+        severity: 'medium' as const,
+        url: article.url,
+        imageUrl: article.urlToImage,
+      }));
+      
+      setFilteredNews(news);
+    } catch (error) {
+      console.error('Failed to fetch news:', error);
+    } finally {
+      setIsLoadingNews(false);
+    }
+  };
+
+  // Auto-refresh news every 60 seconds
+  useEffect(() => {
+    fetchNews();
+    const interval = setInterval(fetchNews, 60000);
+    return () => clearInterval(interval);
+  }, [selectedCountry]);
 
   // Handle command submission
   const handleCommand = (cmd: string) => {
-    // Command handler for future extensions
-    console.log('Command:', cmd);
+    if (cmd.startsWith('/newsnow')) {
+      const country = parseCountryFromPrompt(cmd);
+      if (country) {
+        setSelectedCountry(country);
+        setMapCenter([country.lat, country.lng]);
+      }
+    }
   };
 
   const mockEarthquakes: EarthquakeData[] = [
@@ -920,20 +1014,27 @@ function App() {
       </div>
       
       {/* Bottom Panels */}
-      <div className="flex gap-2 p-3 border-t h-[280px]" style={{
+      <div className="flex gap-2 p-3 border-t max-h-[280px]" style={{
         borderTopColor: 'rgba(75, 85, 99, 0.2)',
         background: 'linear-gradient(180deg, rgba(10,12,16,0.5) 0%, rgba(10,12,16,0.8) 100%)',
       }}>
-        {/* Left: Earth and AI Summary */}
-        <div className="flex-1 grid grid-cols-2 gap-2">
-          <EarthquakePanel earthquakes={mockEarthquakes} />
-          <AISummaryPanel />
+        {/* Left: Real-time News */}
+        <div className="flex-1">
+          <RealTimeNewsPanel 
+            news={filteredNews} 
+            isLoading={isLoadingNews}
+            onRefresh={fetchNews}
+            selectedCountry={selectedCountry}
+          />
         </div>
         
-        {/* Right: Video and Escalation */}
+        {/* Right: Earth, Video and Escalation */}
         <div className="flex flex-col gap-2 w-96">
           <VideoPanel videos={mockVideos} />
-          <EscalationPanel metrics={mockMetrics} />
+          <div className="grid grid-cols-2 gap-2">
+            <EarthquakePanel earthquakes={mockEarthquakes} />
+            <EscalationPanel metrics={mockMetrics} />
+          </div>
         </div>
       </div>
     </div>
