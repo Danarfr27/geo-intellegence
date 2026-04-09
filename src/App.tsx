@@ -646,7 +646,15 @@ function RealTimeNewsPanel({
                       {item.source}
                     </span>
                     <span className="text-gray-600">•</span>
-                    <span className="text-gray-500">{format(item.timestamp, 'HH:mm')}</span>
+                    <span className="text-gray-500">
+                      {new Intl.DateTimeFormat('en-US', {
+                        timeZone: 'Asia/Jakarta',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                      }).format(item.timestamp)}
+                      <span className="text-gray-600 ml-1">WIB</span>
+                    </span>
                   </div>
                   <ExternalLink className="w-3 h-3 text-gray-600 group-hover:text-blue-400 transition-colors flex-shrink-0" />
                 </div>
