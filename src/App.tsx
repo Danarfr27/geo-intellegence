@@ -6,7 +6,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { Globe, Video, Activity, AlertTriangle, Command, TrendingUp, TrendingDown, Clock, Zap, Satellite, ChevronRight, Filter, RefreshCw, Database, Cpu, Eye, Target, Newspaper, ExternalLink, Flame, AlertCircle } from 'lucide-react';
+import { Globe, Video, Activity, AlertTriangle, Command, TrendingUp, TrendingDown, Clock, Zap, Satellite, ChevronRight, Filter, RefreshCw, Database, Cpu, Eye, Target, Newspaper, ExternalLink, Flame, AlertCircle, Menu, X } from 'lucide-react';
 import countries from './lib/countries.json';
 
 // Utility
@@ -140,7 +140,7 @@ const createCustomIcon = (severity: string, type: string) => {
 };
 
 // Components
-function Header({ onCommand, eventCount }: { onCommand: (cmd: string) => void; eventCount: number }) {
+function Header({ onCommand, eventCount, onToggleSidebar, sidebarOpen }: { onCommand: (cmd: string) => void; eventCount: number; onToggleSidebar?: () => void; sidebarOpen?: boolean }) {
   const [command, setCommand] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
   
@@ -160,6 +160,15 @@ function Header({ onCommand, eventCount }: { onCommand: (cmd: string) => void; e
   return (
     <header className="h-12 bg-gradient-to-r from-[#0a0c10] via-[#0f1115] to-[#0a0c10] border-b border-[#2a2f3a] flex items-center px-4 shrink-0 shadow-lg shadow-red-500/5">
       <div className="flex items-center gap-3">
+        {/* Hamburger Menu Button */}
+        <button
+          onClick={onToggleSidebar}
+          className="hidden sm:hidden md:flex lg:hidden items-center justify-center w-8 h-8 text-gray-400 hover:text-red-500 transition-colors"
+          title="Toggle sidebar"
+        >
+          {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
+        
         <div className="relative">
           <Globe className="w-5 h-5 text-red-500 animate-spin" style={{animationDuration: '6s'}} />
           <div className="absolute inset-0 bg-red-500 blur-md opacity-20 rounded-full" />
@@ -858,6 +867,7 @@ function App() {
   const [mapCenter, setMapCenter] = useState<[number, number]>([25, 20]);
   const [selectedCountry, setSelectedCountry] = useState<any>(null);
   const [isLoadingNews, setIsLoadingNews] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Fetch GDELT CSV and parse (auto-refresh every 30 seconds)
   useEffect(() => {
@@ -989,6 +999,7 @@ function App() {
 
   const toggleSatellite = () => setShowSatellite(!showSatellite);
   const handleRefresh = () => setGdeltEvents([...gdeltEvents]);
+  const handleToggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
   const handleFilterChange = (filter: string) => {
     setSelectedFilters(prev => 
@@ -1000,12 +1011,21 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen bg-[#0a0c10] text-gray-100 overflow-hidden">
-      <Header onCommand={handleCommand} eventCount={gdeltEvents.length} />
+      <Header onCommand={handleCommand} eventCount={gdeltEvents.length} onToggleSidebar={handleToggleSidebar} sidebarOpen={sidebarOpen} />
       <StatsPanel />
       
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar */}
-        <Sidebar selectedFilters={selectedFilters} onFilterChange={handleFilterChange} />
+        {/* Left Sidebar - Responsive */}
+        <div className="hidden lg:flex">
+          <Sidebar selectedFilters={selectedFilters} onFilterChange={handleFilterChange} />
+        </div>
+        
+        {/* Mobile/Tablet Sidebar Overlay */}
+        {sidebarOpen && (
+          <div className="absolute z-50 left-0 top-24 h-96 max-h-[calc(100vh-6rem)]">
+            <Sidebar selectedFilters={selectedFilters} onFilterChange={handleFilterChange} />
+          </div>
+        )}
         
         {/* Main Map */}
         <div className="flex-1 flex flex-col overflow-hidden">
