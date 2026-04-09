@@ -592,45 +592,7 @@ function WorldMap({
         </button>
       </div>
       
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4 z-[400] rounded-lg p-3" style={{
-        background: 'linear-gradient(135deg, rgba(15,17,21,0.95) 0%, rgba(10,12,16,0.85) 100%)',
-        border: '1px solid rgba(75, 85, 99, 0.25)',
-        backdropFilter: 'blur(10px)',
-        boxShadow: '0 8px 16px rgba(0, 0, 0, 0.3)',
-      }}>
-        <div className="text-[10px] font-bold text-gray-300 mb-2.5 uppercase tracking-wider">Event Severity</div>
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2.5">
-            <div className="w-2 h-2 rounded-full" style={{
-              background: '#ef4444',
-              boxShadow: '0 0 8px rgba(239, 68, 68, 0.6)'
-            }} />
-            <span className="text-[10px] text-gray-400">Critical</span>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-2 h-2 rounded-full" style={{
-              background: '#f97316',
-              boxShadow: '0 0 8px rgba(249, 115, 22, 0.6)'
-            }} />
-            <span className="text-[10px] text-gray-400">High</span>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-2 h-2 rounded-full" style={{
-              background: '#eab308',
-              boxShadow: '0 0 8px rgba(234, 179, 8, 0.6)'
-            }} />
-            <span className="text-[10px] text-gray-400">Medium</span>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-2 h-2 rounded-full" style={{
-              background: '#10b981',
-              boxShadow: '0 0 8px rgba(16, 185, 129, 0.6)'
-            }} />
-            <span className="text-[10px] text-gray-400">Low</span>
-          </div>
-        </div>
-      </div>
+      {/* Legend removed */}
     </div>
   );
 }
